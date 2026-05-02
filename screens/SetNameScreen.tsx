@@ -48,7 +48,7 @@ export function SetNameScreen({ userId, onCompleted }: SetNameScreenProps) {
           style={styles.input}
           autoCapitalize="words"
           autoCorrect={false}
-          placeholderTextColor="#9AA0A6"
+          placeholderTextColor="#94A3B8"
         />
 
         <Pressable style={[styles.button, saving && styles.buttonDisabled]} onPress={handleContinue} disabled={saving}>
@@ -73,40 +73,42 @@ const styles = StyleSheet.create({
     backgroundColor: '#FFFFFF',
     borderRadius: 16,
     padding: 24,
-    shadowColor: '#1A1A1A',
-    shadowOpacity: 0.1,
+    shadowColor: '#000',
+    shadowOpacity: 0.05,
     shadowRadius: 16,
     shadowOffset: { width: 0, height: 8 },
     elevation: 3,
+    borderWidth: 1,
+    borderColor: '#E5E7EB',
   },
   title: {
     fontSize: 28,
     fontWeight: '700',
-    color: '#1F1F1F',
+    color: '#1A1A1A',
     marginBottom: 8,
   },
   subtitle: {
     fontSize: 14,
-    color: '#6F6F76',
+    color: '#6B7280',
     marginBottom: 20,
   },
   input: {
     borderWidth: 1,
     borderColor: '#E5E7EB',
+    backgroundColor: '#F3F4F6',
     borderRadius: 12,
     paddingHorizontal: 14,
     paddingVertical: 12,
     fontSize: 16,
-    color: '#1F1F1F',
-    marginBottom: 12,
+    color: '#1A1A1A',
+    marginBottom: 20,
   },
   button: {
     height: 48,
     borderRadius: 12,
-    backgroundColor: '#6C5CE7',
+    backgroundColor: '#3B82F6',
     justifyContent: 'center',
     alignItems: 'center',
-    marginTop: 8,
   },
   buttonDisabled: {
     opacity: 0.7,

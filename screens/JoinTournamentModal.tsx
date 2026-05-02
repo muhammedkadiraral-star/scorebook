@@ -13,14 +13,14 @@ import { Ionicons } from '@expo/vector-icons';
 import { supabase } from '../lib/supabase';
 import { COLORS, RADIUS, SPACING } from '../constants/theme';
 
-type JoinGroupModalProps = {
+type JoinTournamentModalProps = {
   visible: boolean;
   userId: string;
   onClose: () => void;
-  onJoined: () => void;
+  onJoined: (tournamentId: string, tournamentName: string) => void;
 };
 
-export function JoinGroupModal({ visible, userId, onClose, onJoined }: JoinGroupModalProps) {
+export function JoinTournamentModal({ visible, userId, onClose, onJoined }: JoinTournamentModalProps) {
   const [code, setCode] = useState('');
   const [loading, setLoading] = useState(false);
 
@@ -30,50 +30,49 @@ export function JoinGroupModal({ visible, userId, onClose, onJoined }: JoinGroup
     setLoading(true);
 
     try {
-      const { data: group, error: groupError } = await supabase
-        .from('groups')
+      const { data: tournament, error: tError } = await supabase
+        .from('tournaments')
         .select('id, name')
         .eq('invite_code', trimmed)
-        .maybeSingle();
+        .single();
 
-      if (groupError) throw groupError;
-      if (!group) {
-        Alert.alert('Invalid code', 'No group found with this invite code.');
+      if (tError || !tournament) {
+        Alert.alert('Tournament not found', 'Check the invite code and try again.');
+        setLoading(false);
         return;
       }
 
-      const { data: existing, error: existingError } = await supabase
-        .from('group_members')
-        .select('id')
-        .eq('group_id', group.id)
-        .eq('user_id', userId)
-        .maybeSingle();
+      const { data: { user } } = await supabase.auth.getUser();
+      const currentUserId = user?.id;
 
-      if (existingError) throw existingError;
-      if (existing) {
-        Alert.alert('Already a member', `You are already in the group "${group.name}".`);
-        onJoined();
+      if (!currentUserId) {
+        Alert.alert('Error', 'User not authenticated.');
+        setLoading(false);
+        return;
+      }
+
+      const { error: joinError } = await supabase.from('tournament_participants').insert({
+        tournament_id: tournament.id,
+        user_id: currentUserId,
+        status: 'registered'
+      });
+
+      if (joinError) {
+        if (joinError.code === '23505') {
+          Alert.alert('Already Joined', 'You are already in this tournament.');
+          onJoined(tournament.id, tournament.name);
+          onClose();
+        } else {
+          Alert.alert('Error', joinError.message);
+        }
+      } else {
+        Alert.alert('Success', `You have joined "${tournament.name}"!`);
+        setCode('');
+        onJoined(tournament.id, tournament.name);
         onClose();
-        return;
       }
-
-      const { error: memberError } = await supabase
-        .from('group_members')
-        .insert({
-          group_id: group.id,
-          user_id: userId,
-          role: 'member',
-        });
-
-      if (memberError) throw memberError;
-
-      Alert.alert('Joined', `Successfully joined "${group.name}".`);
-      setCode('');
-      onJoined();
-      onClose();
     } catch (error) {
-      const message = error instanceof Error ? error.message : 'Something went wrong.';
-      Alert.alert('Error', message);
+      Alert.alert('Error', 'An unexpected error occurred.');
     } finally {
       setLoading(false);
     }
@@ -84,7 +83,7 @@ export function JoinGroupModal({ visible, userId, onClose, onJoined }: JoinGroup
       <Pressable style={styles.overlay} onPress={onClose}>
         <Pressable style={styles.content} onPress={(e) => e.stopPropagation()}>
           <View style={styles.header}>
-            <Text style={styles.title}>Join Group</Text>
+            <Text style={styles.title}>Join Tournament</Text>
             <Pressable onPress={onClose}>
               <Ionicons name="close" size={24} color={COLORS.textSecondary} />
             </Pressable>
@@ -95,7 +94,7 @@ export function JoinGroupModal({ visible, userId, onClose, onJoined }: JoinGroup
             <TextInput
               value={code}
               onChangeText={setCode}
-              placeholder="e.g. AB1234"
+              placeholder="Enter invite code"
               placeholderTextColor={COLORS.textMuted}
               autoCapitalize="characters"
               autoCorrect={false}
@@ -107,7 +106,7 @@ export function JoinGroupModal({ visible, userId, onClose, onJoined }: JoinGroup
               onPress={handleJoin}
               disabled={!code.trim() || loading}
             >
-              {loading ? <ActivityIndicator color="#FFFFFF" /> : <Text style={styles.joinButtonText}>Join Group</Text>}
+              {loading ? <ActivityIndicator color="#FFFFFF" /> : <Text style={styles.joinButtonText}>Join Tournament</Text>}
             </Pressable>
           </View>
         </Pressable>

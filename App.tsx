@@ -1,18 +1,33 @@
 import { useEffect, useState } from 'react';
-import { ActivityIndicator, Alert, Pressable, SafeAreaView, StyleSheet, Text, TextInput, View } from 'react-native';
+import { ActivityIndicator, Alert, Modal, Pressable, SafeAreaView, StyleSheet, Text, TextInput, View } from 'react-native';
 import { StatusBar } from 'expo-status-bar';
 import type { Session, User } from '@supabase/supabase-js';
+import { Ionicons } from '@expo/vector-icons';
 import { supabase } from './lib/supabase';
 import { GroupsScreen } from './screens/GroupsScreen';
 import { GroupDetailScreen, type GroupMemberOption } from './screens/GroupDetailScreen';
 import { NewMatchScreen } from './screens/NewMatchScreen';
 import { SetNameScreen } from './screens/SetNameScreen';
 import { ProfileScreen } from './screens/ProfileScreen';
+import { GameSelectScreen } from './screens/GameSelectScreen';
+import { CreateGroupScreen } from './screens/CreateGroupScreen';
+import { NotificationsScreen } from './screens/NotificationsScreen';
+import { JoinGroupModal } from './screens/JoinGroupModal';
+import { JoinTournamentModal } from './screens/JoinTournamentModal';
+import { TournamentsScreen } from './screens/TournamentsScreen';
+import { CreateTournamentScreen } from './screens/CreateTournamentScreen';
+import { TournamentDetailScreen } from './screens/TournamentDetailScreen';
 
 type AppRoute =
   | { name: 'groups' }
+  | { name: 'notifications' }
   | { name: 'profile' }
+  | { name: 'tournaments' }
+  | { name: 'gameSelect'; target: 'group' | 'tournament' }
+  | { name: 'createGroup'; gameType: string }
+  | { name: 'createTournament'; gameType: string }
   | { name: 'groupDetail'; groupId: string; groupName: string }
+  | { name: 'tournamentDetail'; tournamentId: string; tournamentName: string }
   | { name: 'newMatch'; groupId: string; groupName: string; members: GroupMemberOption[] };
 
 export default function App() {
@@ -24,6 +39,12 @@ export default function App() {
   const [checkingUserRecord, setCheckingUserRecord] = useState(false);
   const [needsDisplayName, setNeedsDisplayName] = useState(false);
   const [route, setRoute] = useState<AppRoute>({ name: 'groups' });
+
+  // Tab state modals
+  const [showPlusModal, setShowPlusModal] = useState(false);
+  const [joinVisible, setJoinVisible] = useState(false);
+  const [joinTournamentVisible, setJoinTournamentVisible] = useState(false);
+  const [unreadCount, setUnreadCount] = useState(0);
 
   const ensurePublicUserRecord = async (authUser: User) => {
     const fallbackName = authUser.email ?? `user-${authUser.id.slice(0, 8)}`;
@@ -120,6 +141,33 @@ export default function App() {
     };
   }, [session]);
 
+  const fetchUnreadCount = async () => {
+    if (!session?.user) return;
+    try {
+      const { count, error } = await supabase
+        .from('notifications')
+        .select('*', { count: 'exact', head: true })
+        .eq('user_id', session.user.id)
+        .eq('is_read', false);
+      
+      if (error) throw error;
+      setUnreadCount(count ?? 0);
+    } catch (err) {
+      console.error('Error fetching unread count:', err);
+    }
+  };
+
+  useEffect(() => {
+    if (!session?.user) return;
+    
+    void fetchUnreadCount();
+    const interval = setInterval(() => {
+      void fetchUnreadCount();
+    }, 30000);
+
+    return () => clearInterval(interval);
+  }, [session?.user]);
+
   const handleAuth = async () => {
     const trimmedEmail = email.trim();
     const trimmedPassword = password.trim();
@@ -180,7 +228,7 @@ export default function App() {
     return (
       <SafeAreaView style={styles.container}>
         <StatusBar style="dark" />
-        <ActivityIndicator color="#6C5CE7" />
+        <ActivityIndicator color="#3B82F6" />
       </SafeAreaView>
     );
   }
@@ -203,6 +251,7 @@ export default function App() {
         <GroupDetailScreen
           groupId={route.groupId}
           groupName={route.groupName}
+          userId={session.user.id}
           onBack={() => setRoute({ name: 'groups' })}
           onAddMatch={(members) =>
             setRoute({
@@ -240,32 +289,213 @@ export default function App() {
       );
     }
 
-    if (route.name === 'profile') {
+    if (route.name === 'gameSelect') {
       return (
-        <ProfileScreen
+        <GameSelectScreen
           userId={session.user.id}
           onBack={() => setRoute({ name: 'groups' })}
-          onSignOut={handleSignOut}
-          loadingSignOut={loading}
+          onSelectGame={(gameName) => {
+            if (route.target === 'tournament') {
+              setRoute({ name: 'createTournament', gameType: gameName });
+            } else {
+              setRoute({ name: 'createGroup', gameType: gameName });
+            }
+          }}
         />
       );
     }
 
-    return (
-      <GroupsScreen
-        userId={session.user.id}
-        onSignOut={handleSignOut}
-        loadingSignOut={loading}
-        onOpenProfile={() => setRoute({ name: 'profile' })}
-        onOpenGroup={(group) =>
-          setRoute({
-            name: 'groupDetail',
-            groupId: group.id,
-            groupName: group.name,
-          })
-        }
-      />
-    );
+    if (route.name === 'createTournament') {
+      return (
+        <CreateTournamentScreen
+          userId={session.user.id}
+          gameType={route.gameType}
+          onBack={() => setRoute({ name: 'tournaments' })}
+          onCreated={() => setRoute({ name: 'tournaments' })}
+        />
+      );
+    }
+
+    if (route.name === 'tournamentDetail') {
+      return (
+        <TournamentDetailScreen
+          userId={session.user.id}
+          tournamentId={route.tournamentId}
+          tournamentName={route.tournamentName}
+          onBack={() => setRoute({ name: 'tournaments' })}
+        />
+      );
+    }
+
+    if (route.name === 'createGroup') {
+      return (
+        <CreateGroupScreen
+          userId={session.user.id}
+          gameType={route.gameType}
+          onBack={() => setRoute({ name: 'groups' })}
+          onCreated={async () => {}}
+        />
+      );
+    }
+
+    if (route.name === 'groups' || route.name === 'profile' || route.name === 'notifications' || route.name === 'tournaments') {
+      return (
+        <View style={styles.mainTabWrapper}>
+          <StatusBar style="dark" />
+          <View style={styles.mainContent}>
+            {route.name === 'groups' && (
+              <GroupsScreen
+                userId={session.user.id}
+                onOpenGroup={(group) =>
+                  setRoute({
+                    name: 'groupDetail',
+                    groupId: group.id,
+                    groupName: group.name,
+                  })
+                }
+              />
+            )}
+            {route.name === 'profile' && (
+              <ProfileScreen
+                userId={session.user.id}
+                onBack={() => setRoute({ name: 'groups' })}
+                onSignOut={handleSignOut}
+                loadingSignOut={loading}
+              />
+            )}
+            {route.name === 'notifications' && <NotificationsScreen />}
+            {route.name === 'tournaments' && (
+              <TournamentsScreen
+                userId={session.user.id}
+                onOpenTournament={(t) =>
+                  setRoute({
+                    name: 'tournamentDetail',
+                    tournamentId: t.id,
+                    tournamentName: t.name,
+                  })
+                }
+              />
+            )}
+          </View>
+
+          {/* Bottom Tab Bar */}
+          <SafeAreaView style={styles.tabBarSafeArea}>
+            <View style={styles.tabBarContainer}>
+              <View style={styles.tabPill}>
+                <Pressable style={styles.tabItem} onPress={() => setRoute({ name: 'groups' })}>
+                  <Ionicons name="game-controller" size={24} color={route.name === 'groups' ? '#3B82F6' : '#9CA3AF'} />
+                </Pressable>
+                <Pressable style={styles.tabItem} onPress={() => setRoute({ name: 'tournaments' })}>
+                  <Ionicons name="trophy" size={24} color={route.name === 'tournaments' ? '#3B82F6' : '#9CA3AF'} />
+                </Pressable>
+                <Pressable 
+                  style={styles.tabItem} 
+                  onPress={() => {
+                    setRoute({ name: 'notifications' });
+                    setUnreadCount(0); // Optimistic clear
+                  }}
+                >
+                  <View>
+                    <Ionicons name="notifications" size={24} color={route.name === 'notifications' ? '#3B82F6' : '#9CA3AF'} />
+                    {unreadCount > 0 && <View style={styles.unreadBadge} />}
+                  </View>
+                </Pressable>
+                <Pressable style={styles.tabItem} onPress={() => setRoute({ name: 'profile' })}>
+                  <Ionicons name="person" size={24} color={route.name === 'profile' ? '#3B82F6' : '#9CA3AF'} />
+                </Pressable>
+              </View>
+              <Pressable style={styles.plusButton} onPress={() => setShowPlusModal(true)}>
+                <Ionicons name="add" size={32} color="#FFFFFF" />
+              </Pressable>
+            </View>
+          </SafeAreaView>
+
+          {/* Plus Action Modal */}
+          <Modal visible={showPlusModal} transparent animationType="slide" onRequestClose={() => setShowPlusModal(false)}>
+            <Pressable style={styles.modalOverlay} onPress={() => setShowPlusModal(false)}>
+              <Pressable style={styles.actionSheet} onPress={(e) => e.stopPropagation()}>
+                <Pressable
+                  style={styles.actionItem}
+                  onPress={() => {
+                    setShowPlusModal(false);
+                    setRoute({ name: 'gameSelect', target: 'group' });
+                  }}
+                >
+                  <View style={{ flexDirection: 'row', alignItems: 'center', gap: 12 }}>
+                    <Ionicons name="add-circle-outline" size={24} color="#111827" />
+                    <Text style={styles.actionItemText}>Create Group</Text>
+                  </View>
+                  <Ionicons name="chevron-forward" size={20} color="#9CA3AF" />
+                </Pressable>
+                <View style={styles.actionDivider} />
+                <Pressable
+                  style={styles.actionItem}
+                  onPress={() => {
+                    setShowPlusModal(false);
+                    setJoinVisible(true);
+                  }}
+                >
+                  <View style={{ flexDirection: 'row', alignItems: 'center', gap: 12 }}>
+                    <Ionicons name="enter-outline" size={24} color="#111827" />
+                    <Text style={styles.actionItemText}>Join Group</Text>
+                  </View>
+                  <Ionicons name="chevron-forward" size={20} color="#9CA3AF" />
+                </Pressable>
+                <View style={styles.actionDivider} />
+                <Pressable
+                  style={styles.actionItem}
+                  onPress={() => {
+                    setShowPlusModal(false);
+                    setRoute({ name: 'gameSelect', target: 'tournament' });
+                  }}
+                >
+                  <View style={{ flexDirection: 'row', alignItems: 'center', gap: 12 }}>
+                    <Ionicons name="trophy-outline" size={24} color="#111827" />
+                    <Text style={styles.actionItemText}>Create Tournament</Text>
+                  </View>
+                  <Ionicons name="chevron-forward" size={20} color="#9CA3AF" />
+                </Pressable>
+                <View style={styles.actionDivider} />
+                <Pressable
+                  style={styles.actionItem}
+                  onPress={() => {
+                    setShowPlusModal(false);
+                    setJoinTournamentVisible(true);
+                  }}
+                >
+                  <View style={{ flexDirection: 'row', alignItems: 'center', gap: 12 }}>
+                    <Ionicons name="ticket-outline" size={24} color="#111827" />
+                    <Text style={styles.actionItemText}>Join Tournament</Text>
+                  </View>
+                  <Ionicons name="chevron-forward" size={20} color="#9CA3AF" />
+                </Pressable>
+                <Pressable style={styles.actionCancel} onPress={() => setShowPlusModal(false)}>
+                  <Text style={styles.actionCancelText}>Cancel</Text>
+                </Pressable>
+              </Pressable>
+            </Pressable>
+          </Modal>
+
+          <JoinGroupModal
+            visible={joinVisible}
+            userId={session.user.id}
+            onClose={() => setJoinVisible(false)}
+            onJoined={async () => {
+              setRoute({ name: 'groups' });
+            }}
+          />
+
+          <JoinTournamentModal
+            visible={joinTournamentVisible}
+            userId={session.user.id}
+            onClose={() => setJoinTournamentVisible(false)}
+            onJoined={(id, name) => {
+              setRoute({ name: 'tournamentDetail', tournamentId: id, tournamentName: name });
+            }}
+          />
+        </View>
+      );
+    }
   }
 
   return (
@@ -285,7 +515,7 @@ export default function App() {
           autoCapitalize="none"
           autoCorrect={false}
           style={styles.input}
-          placeholderTextColor="#9AA0A6"
+          placeholderTextColor="#6B7280"
         />
         <TextInput
           value={password}
@@ -295,7 +525,7 @@ export default function App() {
           autoCapitalize="none"
           autoCorrect={false}
           style={styles.input}
-          placeholderTextColor="#9AA0A6"
+          placeholderTextColor="#6B7280"
         />
 
         <Pressable
@@ -334,37 +564,40 @@ const styles = StyleSheet.create({
     backgroundColor: '#FFFFFF',
     borderRadius: 16,
     padding: 24,
-    shadowColor: '#1A1A1A',
-    shadowOpacity: 0.1,
+    shadowColor: '#000',
+    shadowOpacity: 0.05,
     shadowRadius: 16,
     shadowOffset: { width: 0, height: 8 },
     elevation: 3,
+    borderWidth: 1,
+    borderColor: '#E5E7EB',
   },
   title: {
     fontSize: 28,
     fontWeight: '700',
-    color: '#1F1F1F',
+    color: '#1A1A1A',
     marginBottom: 8,
   },
   subtitle: {
     fontSize: 14,
-    color: '#6F6F76',
+    color: '#6B7280',
     marginBottom: 20,
   },
   input: {
     borderWidth: 1,
     borderColor: '#E5E7EB',
+    backgroundColor: '#F3F4F6',
     borderRadius: 12,
     paddingHorizontal: 14,
     paddingVertical: 12,
     fontSize: 16,
-    color: '#1F1F1F',
+    color: '#1A1A1A',
     marginBottom: 12,
   },
   button: {
     height: 48,
     borderRadius: 12,
-    backgroundColor: '#6C5CE7',
+    backgroundColor: '#3B82F6',
     justifyContent: 'center',
     alignItems: 'center',
     marginTop: 8,
@@ -380,8 +613,106 @@ const styles = StyleSheet.create({
   toggleText: {
     marginTop: 16,
     textAlign: 'center',
-    color: '#6C5CE7',
+    color: '#3B82F6',
     fontSize: 14,
     fontWeight: '500',
+  },
+  mainTabWrapper: {
+    flex: 1,
+    backgroundColor: '#FFFFFF',
+  },
+  mainContent: {
+    flex: 1,
+  },
+  tabBarSafeArea: {
+    backgroundColor: '#FFFFFF',
+    borderTopWidth: 1,
+    borderTopColor: '#E5E7EB',
+  },
+  tabBarContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingHorizontal: 24,
+    paddingVertical: 12,
+    gap: 16,
+  },
+  tabPill: {
+    flex: 1,
+    flexDirection: 'row',
+    backgroundColor: '#F3F4F6',
+    borderRadius: 28,
+    height: 64,
+    paddingHorizontal: 16,
+    justifyContent: 'space-around',
+    alignItems: 'center',
+  },
+  tabItem: {
+    padding: 10,
+  },
+  plusButton: {
+    width: 56,
+    height: 56,
+    borderRadius: 28,
+    backgroundColor: '#3B82F6',
+    justifyContent: 'center',
+    alignItems: 'center',
+    shadowColor: '#3B82F6',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.3,
+    shadowRadius: 8,
+    elevation: 4,
+  },
+  modalOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0,0,0,0.4)',
+    justifyContent: 'flex-end',
+  },
+  actionSheet: {
+    backgroundColor: '#FFFFFF',
+    borderTopLeftRadius: 24,
+    borderTopRightRadius: 24,
+    paddingTop: 16,
+    paddingBottom: 40,
+    paddingHorizontal: 24,
+  },
+  actionItem: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    height: 64,
+  },
+  actionItemText: {
+    fontSize: 17,
+    fontWeight: '600',
+    color: '#111827',
+  },
+  actionDivider: {
+    height: 1,
+    backgroundColor: '#E5E7EB',
+  },
+  actionCancel: {
+    marginTop: 16,
+    backgroundColor: '#F3F4F6',
+    borderRadius: 16,
+    height: 56,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  actionCancelText: {
+    fontSize: 16,
+    fontWeight: '600',
+    color: '#111827',
+  },
+  unreadBadge: {
+    position: 'absolute',
+    top: -2,
+    right: -2,
+    width: 10,
+    height: 10,
+    borderRadius: 5,
+    backgroundColor: '#EF4444',
+    borderWidth: 1,
+    borderColor: '#F3F4F6',
   },
 });
