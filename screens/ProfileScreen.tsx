@@ -22,14 +22,6 @@ type ProfileScreenProps = {
   loadingSignOut: boolean;
 };
 
-type GroupRow = {
-  groups: {
-    id: string;
-    name: string;
-    game_type: string;
-  } | null;
-};
-
 type MatchRow = {
   id: string;
   group_id: string;
@@ -37,6 +29,11 @@ type MatchRow = {
   player_away: string;
   score_home: number;
   score_away: number;
+  created_at: string;
+  groups: {
+    name: string;
+    game_type: string;
+  } | null;
 };
 
 type RivalStat = {
@@ -59,60 +56,37 @@ export function ProfileScreen({ userId, onSignOut, loadingSignOut }: ProfileScre
   const [loading, setLoading] = useState(true);
   const [displayName, setDisplayName] = useState('Player');
   const [avatarUrl, setAvatarUrl] = useState<string | null>(null);
-  const [groups, setGroups] = useState<{ id: string; name: string; gameType: string; winRate: number }[]>([]);
+  const [createdAt, setCreatedAt] = useState<string | null>(null);
+  
   const [matches, setMatches] = useState<MatchRow[]>([]);
   const [rivalsInfo, setRivalsInfo] = useState<Record<string, { name: string; avatarUrl: string | null }>>({});
+  
+  const [activeTab, setActiveTab] = useState<'recent' | 'stats' | 'rivals'>('recent');
   const [showAvatarModal, setShowAvatarModal] = useState(false);
   const [savingAvatar, setSavingAvatar] = useState(false);
 
   const loadProfile = useCallback(async () => {
     setLoading(true);
     try {
-      const [{ data: profileData, error: profileError }, { data: groupData, error: groupError }, { data: matchData, error: matchError }] =
+      const [{ data: profileData, error: profileError }, { data: matchData, error: matchError }] =
         await Promise.all([
-          supabase.from('users').select('display_name, avatar_url').eq('id', userId).maybeSingle(),
-          supabase.from('group_members').select('groups(id, name, game_type)').eq('user_id', userId),
+          supabase.from('users').select('display_name, avatar_url, created_at').eq('id', userId).maybeSingle(),
           supabase
             .from('matches')
-            .select('id, group_id, player_home, player_away, score_home, score_away')
-            .or(`player_home.eq.${userId},player_away.eq.${userId}`),
+            .select('id, group_id, player_home, player_away, score_home, score_away, created_at, groups(name, game_type)')
+            .or(`player_home.eq.${userId},player_away.eq.${userId}`)
+            .order('created_at', { ascending: false }),
         ]);
 
       if (profileError) throw profileError;
-      if (groupError) throw groupError;
       if (matchError) throw matchError;
 
       setDisplayName(profileData?.display_name ?? 'Player');
       setAvatarUrl(profileData?.avatar_url ?? null);
+      setCreatedAt(profileData?.created_at ?? null);
 
-      const parsedGroups = ((groupData ?? []) as unknown as GroupRow[])
-        .map((row) => row.groups)
-        .filter((group): group is NonNullable<GroupRow['groups']> => Boolean(group));
-
-      const allMatches = (matchData ?? []) as MatchRow[];
+      const allMatches = (matchData ?? []) as unknown as MatchRow[];
       setMatches(allMatches);
-
-      const groupsWithRates = parsedGroups.map((group) => {
-        const groupMatches = allMatches.filter((match) => match.group_id === group.id);
-        if (groupMatches.length === 0) {
-          return { id: group.id, name: group.name, gameType: group.game_type, winRate: 0 };
-        }
-
-        let wins = 0;
-        groupMatches.forEach((match) => {
-          const myScore = match.player_home === userId ? match.score_home : match.score_away;
-          const oppScore = match.player_home === userId ? match.score_away : match.score_home;
-          if (myScore > oppScore) wins += 1;
-        });
-
-        return {
-          id: group.id,
-          name: group.name,
-          gameType: group.game_type,
-          winRate: (wins / groupMatches.length) * 100,
-        };
-      });
-      setGroups(groupsWithRates);
 
       const rivalIds = Array.from(
         new Set(
@@ -188,6 +162,36 @@ export function ProfileScreen({ userId, onSignOut, loadingSignOut }: ProfileScre
     return { total, wins, losses, draws, goalsFor, goalsAgainst, winRate };
   }, [matches, userId]);
 
+  const recentMatches = useMemo(() => matches.slice(0, 10), [matches]);
+
+  const gameStats = useMemo(() => {
+    const map: Record<string, { gameType: string; name: string; matches: number; wins: number; losses: number; draws: number }> = {};
+
+    matches.forEach(match => {
+      const gt = match.groups?.game_type;
+      if (!gt) return;
+
+      if (!map[gt]) {
+        map[gt] = { gameType: gt, name: getGameDisplayName(gt), matches: 0, wins: 0, losses: 0, draws: 0 };
+      }
+
+      const myScore = match.player_home === userId ? match.score_home : match.score_away;
+      const oppScore = match.player_home === userId ? match.score_away : match.score_home;
+
+      map[gt].matches += 1;
+      if (myScore > oppScore) map[gt].wins += 1;
+      else if (myScore < oppScore) map[gt].losses += 1;
+      else map[gt].draws += 1;
+    });
+
+    return Object.values(map)
+      .map(stat => ({
+        ...stat,
+        winRate: stat.matches > 0 ? (stat.wins / stat.matches) * 100 : 0
+      }))
+      .sort((a, b) => b.matches - a.matches);
+  }, [matches, userId]);
+
   const topRivals = useMemo<RivalStat[]>(() => {
     const map: Record<string, RivalStat> = {};
 
@@ -215,22 +219,37 @@ export function ProfileScreen({ userId, onSignOut, loadingSignOut }: ProfileScre
       else map[rivalId].draws += 1;
     });
 
-    return Object.values(map).sort((a, b) => b.matches - a.matches);
+    return Object.values(map).sort((a, b) => b.matches - a.matches).slice(0, 5);
   }, [matches, rivalsInfo, userId]);
 
   const initial = displayName.trim().charAt(0).toUpperCase() || 'P';
 
-  const renderStatCard = (value: string | number, label: string) => (
-    <View style={styles.statCard}>
-      <Text style={styles.statValue}>{value}</Text>
-      <Text style={styles.statLabel}>{label}</Text>
-    </View>
-  );
+  const renderMemberSince = () => {
+    if (!createdAt) return null;
+    const date = new Date(createdAt);
+    const month = date.toLocaleString('default', { month: 'long' });
+    const year = date.getFullYear();
+    return <Text style={styles.memberSince}>Member since {month} {year}</Text>;
+  };
+
+  const getRelativeTime = (dateStr: string) => {
+    const date = new Date(dateStr);
+    const now = new Date();
+    const diffInSeconds = Math.floor((now.getTime() - date.getTime()) / 1000);
+
+    if (diffInSeconds < 60) return 'Just now';
+    if (diffInSeconds < 3600) return `${Math.floor(diffInSeconds / 60)}m ago`;
+    if (diffInSeconds < 86400) return `${Math.floor(diffInSeconds / 3600)}h ago`;
+    if (diffInSeconds < 172800) return 'Yesterday';
+    return `${Math.floor(diffInSeconds / 86400)} days ago`;
+  };
 
   if (loading) {
     return (
       <SafeAreaView style={styles.container}>
-        <ActivityIndicator color={COLORS.primary} />
+        <View style={styles.center}>
+          <ActivityIndicator color={COLORS.primary} />
+        </View>
       </SafeAreaView>
     );
   }
@@ -238,6 +257,8 @@ export function ProfileScreen({ userId, onSignOut, loadingSignOut }: ProfileScre
   return (
     <SafeAreaView style={styles.container}>
       <ScrollView contentContainerStyle={styles.content} showsVerticalScrollIndicator={false} indicatorStyle="white">
+        
+        {/* HEADER */}
         <View style={styles.header}>
           <Pressable style={styles.avatarContainer} onPress={() => setShowAvatarModal(true)}>
             <View style={styles.avatar}>
@@ -248,88 +269,189 @@ export function ProfileScreen({ userId, onSignOut, loadingSignOut }: ProfileScre
             </View>
           </Pressable>
           <Text style={styles.name}>{displayName}</Text>
+          {renderMemberSince()}
         </View>
 
-        <View style={styles.section}>
-          <Text style={styles.sectionTitle}>Overall Stats</Text>
-          <View style={styles.statsGrid}>
-            <View style={styles.statsRow}>
-              {renderStatCard(overall.total, 'Matches')}
-              {renderStatCard(overall.wins, 'Wins')}
-              {renderStatCard(overall.losses, 'Losses')}
+        {/* OVERALL STATS CARD */}
+        <View style={styles.overallStatsCard}>
+          <View style={styles.statsRow}>
+            <View style={styles.statCell}>
+              <Text style={styles.statValue}>{overall.total}</Text>
+              <Text style={styles.statLabel}>Matches</Text>
             </View>
-            <View style={styles.statsRow}>
-              {renderStatCard(overall.draws, 'Draws')}
-              {renderStatCard(`${overall.winRate.toFixed(1)}%`, 'Win Rate')}
-              {renderStatCard(overall.goalsFor, 'Goals')}
+            <View style={[styles.statCell, styles.cellBorderLeft, styles.cellBorderRight]}>
+              <Text style={[styles.statValue, { color: COLORS.success }]}>{overall.wins}</Text>
+              <Text style={styles.statLabel}>Wins</Text>
+            </View>
+            <View style={styles.statCell}>
+              <Text style={[styles.statValue, { color: COLORS.error }]}>{overall.losses}</Text>
+              <Text style={styles.statLabel}>Losses</Text>
+            </View>
+          </View>
+          <View style={styles.statsDivider} />
+          <View style={styles.statsRow}>
+            <View style={styles.statCell}>
+              <Text style={[styles.statValue, { color: COLORS.warning }]}>{overall.draws}</Text>
+              <Text style={styles.statLabel}>Draws</Text>
+            </View>
+            <View style={[styles.statCell, styles.cellBorderLeft, styles.cellBorderRight]}>
+              <Text style={[styles.statValue, { color: COLORS.primary }]}>{overall.winRate.toFixed(1)}%</Text>
+              <Text style={styles.statLabel}>Win Rate</Text>
+            </View>
+            <View style={styles.statCell}>
+              <Text style={styles.statValue}>{overall.goalsFor}</Text>
+              <Text style={styles.statLabel}>Goals</Text>
             </View>
           </View>
         </View>
 
-        <View style={styles.section}>
-          <Text style={styles.sectionTitle}>All Groups</Text>
-          {groups.length === 0 ? (
-            <Text style={styles.mutedText}>No groups yet.</Text>
-          ) : (
-            groups.map((group) => {
-              const emoji = getGameEmoji(group.gameType);
-              const gameName = getGameDisplayName(group.gameType);
-              return (
-                <View key={group.id} style={styles.groupCard}>
-                  <View style={styles.groupEmojiContainer}>
-                    <Text style={styles.groupEmojiText}>{emoji}</Text>
+        {/* TAB SELECTOR */}
+        <View style={styles.tabSelector}>
+          <Pressable 
+            style={[styles.tabButton, activeTab === 'recent' && styles.tabButtonActive]} 
+            onPress={() => setActiveTab('recent')}
+          >
+            <Text style={[styles.tabText, activeTab === 'recent' && styles.tabTextActive]}>Recent</Text>
+          </Pressable>
+          <Pressable 
+            style={[styles.tabButton, activeTab === 'stats' && styles.tabButtonActive]} 
+            onPress={() => setActiveTab('stats')}
+          >
+            <Text style={[styles.tabText, activeTab === 'stats' && styles.tabTextActive]}>Stats</Text>
+          </Pressable>
+          <Pressable 
+            style={[styles.tabButton, activeTab === 'rivals' && styles.tabButtonActive]} 
+            onPress={() => setActiveTab('rivals')}
+          >
+            <Text style={[styles.tabText, activeTab === 'rivals' && styles.tabTextActive]}>Rivals</Text>
+          </Pressable>
+        </View>
+
+        {/* TAB CONTENT */}
+        <View style={styles.tabContent}>
+          {/* RECENT TAB */}
+          {activeTab === 'recent' && (
+            <View>
+              {recentMatches.length === 0 ? (
+                <Text style={styles.emptyText}>No matches yet. Start playing!</Text>
+              ) : (
+                recentMatches.map((match) => {
+                  const isHome = match.player_home === userId;
+                  const myScore = isHome ? match.score_home : match.score_away;
+                  const oppScore = isHome ? match.score_away : match.score_home;
+                  
+                  const oppId = isHome ? match.player_away : match.player_home;
+                  const oppName = rivalsInfo[oppId]?.name ?? 'Unknown Player';
+                  
+                  const isWin = myScore > oppScore;
+                  const isLoss = myScore < oppScore;
+                  const resultColor = isWin ? COLORS.success : (isLoss ? COLORS.error : COLORS.warning);
+
+                  return (
+                    <View key={match.id} style={styles.recentCard}>
+                      <View style={[styles.resultIndicator, { backgroundColor: resultColor }]} />
+                      <View style={styles.recentContent}>
+                        <View style={styles.recentHeader}>
+                          <Text style={styles.recentGroupText}>
+                            {getGameEmoji(match.groups?.game_type || '')} {match.groups?.name || 'Unknown Group'}
+                          </Text>
+                          <Text style={styles.recentTimeText}>{getRelativeTime(match.created_at)}</Text>
+                        </View>
+                        <View style={styles.recentScoreboard}>
+                          <Text style={[styles.recentPlayerText, { color: COLORS.textPrimary, fontWeight: '600' }]} numberOfLines={1}>
+                            {displayName}
+                          </Text>
+                          <View style={styles.recentScoreWrapper}>
+                            <Text style={styles.recentScoreText}>{myScore} - {oppScore}</Text>
+                          </View>
+                          <Text style={[styles.recentPlayerText, { color: COLORS.textSecondary, textAlign: 'right' }]} numberOfLines={1}>
+                            {oppName}
+                          </Text>
+                        </View>
+                      </View>
+                    </View>
+                  );
+                })
+              )}
+            </View>
+          )}
+
+          {/* STATS TAB */}
+          {activeTab === 'stats' && (
+            <View>
+              {gameStats.length === 0 ? (
+                <Text style={styles.emptyText}>No stats available.</Text>
+              ) : (
+                gameStats.map((stat) => (
+                  <View key={stat.gameType} style={styles.gameStatCard}>
+                    <Text style={styles.gameStatTitle}>{getGameEmoji(stat.gameType)} {stat.name}</Text>
+                    <View style={styles.gameStatRow}>
+                      <View style={styles.gameStatCol}><Text style={styles.gameStatVal}>{stat.matches}</Text><Text style={styles.gameStatLbl}>Matches</Text></View>
+                      <View style={styles.gameStatCol}><Text style={styles.gameStatVal}>{stat.wins}</Text><Text style={styles.gameStatLbl}>W</Text></View>
+                      <View style={styles.gameStatCol}><Text style={styles.gameStatVal}>{stat.losses}</Text><Text style={styles.gameStatLbl}>L</Text></View>
+                      <View style={styles.gameStatCol}><Text style={styles.gameStatVal}>{stat.draws}</Text><Text style={styles.gameStatLbl}>D</Text></View>
+                      <View style={styles.gameStatCol}><Text style={[styles.gameStatVal, { color: COLORS.primary }]}>{stat.winRate.toFixed(0)}%</Text><Text style={styles.gameStatLbl}>Rate</Text></View>
+                    </View>
+                    <View style={styles.progressBarBg}>
+                      <View style={[styles.progressBarFill, { width: `${stat.winRate}%` }]} />
+                    </View>
                   </View>
-                  <View style={styles.groupInfo}>
-                    <Text style={styles.groupName}>{group.name}</Text>
-                    <Text style={styles.groupSubtitle}>Win Rate: {group.winRate.toFixed(1)}% · {gameName}</Text>
-                  </View>
-                </View>
-              );
-            })
+                ))
+              )}
+            </View>
+          )}
+
+          {/* RIVALS TAB */}
+          {activeTab === 'rivals' && (
+            <View>
+              {topRivals.length === 0 ? (
+                <Text style={styles.emptyText}>No rival data yet.</Text>
+              ) : (
+                topRivals.map((rival, index) => {
+                  const info = rivalsInfo[rival.rivalId];
+                  const rivalInitial = (info?.name ?? 'P').trim().charAt(0).toUpperCase();
+                  const avatarColor = AVATAR_COLORS[index % AVATAR_COLORS.length];
+                  
+                  const winPct = (rival.wins / rival.matches) * 100;
+                  const lossPct = (rival.losses / rival.matches) * 100;
+                  const drawPct = (rival.draws / rival.matches) * 100;
+
+                  return (
+                    <View key={rival.rivalId} style={styles.rivalCard}>
+                      <View style={styles.rivalTopRow}>
+                        <View style={[styles.rivalAvatar, { backgroundColor: COLORS.primaryMuted }]}>
+                          <Text style={styles.rivalAvatarText}>{info?.avatarUrl ?? rivalInitial}</Text>
+                        </View>
+                        <View style={styles.rivalInfo}>
+                          <Text style={styles.rivalName}>{rival.rivalName}</Text>
+                          <Text style={styles.rivalSubtitle}>{rival.matches} matches played</Text>
+                        </View>
+                        <View style={styles.rivalBadges}>
+                          <View style={[styles.statPill, styles.winPill]}><Text style={styles.winPillText}>{rival.wins}W</Text></View>
+                          <View style={[styles.statPill, styles.lossPill]}><Text style={styles.lossPillText}>{rival.losses}L</Text></View>
+                          <View style={[styles.statPill, styles.drawPill]}><Text style={styles.drawPillText}>{rival.draws}D</Text></View>
+                        </View>
+                      </View>
+                      <View style={styles.stackedBar}>
+                        {winPct > 0 && <View style={[styles.barSegment, { backgroundColor: COLORS.success, width: `${winPct}%` }]} />}
+                        {drawPct > 0 && <View style={[styles.barSegment, { backgroundColor: COLORS.warning, width: `${drawPct}%` }]} />}
+                        {lossPct > 0 && <View style={[styles.barSegment, { backgroundColor: COLORS.error, width: `${lossPct}%` }]} />}
+                      </View>
+                    </View>
+                  );
+                })
+              )}
+            </View>
           )}
         </View>
 
-        <View style={styles.section}>
-          <Text style={styles.sectionTitle}>Top Rivals</Text>
-          {topRivals.length === 0 ? (
-            <Text style={styles.mutedText}>No rival data yet.</Text>
-          ) : (
-            topRivals.map((rival, index) => {
-              const info = rivalsInfo[rival.rivalId];
-              const rivalInitial = (info?.name ?? 'P').trim().charAt(0).toUpperCase();
-              const avatarColor = AVATAR_COLORS[index % AVATAR_COLORS.length];
-
-              return (
-                <View key={rival.rivalId} style={styles.rivalCard}>
-                  <View style={[styles.rivalAvatar, { backgroundColor: avatarColor }]}>
-                    <Text style={styles.rivalAvatarText}>{info?.avatarUrl ?? rivalInitial}</Text>
-                  </View>
-                  <View style={styles.rivalInfo}>
-                    <Text style={styles.rivalName}>{rival.rivalName}</Text>
-                    <Text style={styles.rivalSubtitle}>{rival.matches} {rival.matches === 1 ? 'match' : 'matches'} played</Text>
-                  </View>
-                  <View style={styles.rivalBadges}>
-                    <View style={[styles.statPill, styles.winPill]}>
-                      <Text style={[styles.statPillText, styles.winPillText]}>{rival.wins}W</Text>
-                    </View>
-                    <View style={[styles.statPill, styles.lossPill]}>
-                      <Text style={[styles.statPillText, styles.lossPillText]}>{rival.losses}L</Text>
-                    </View>
-                    <View style={[styles.statPill, styles.drawPill]}>
-                      <Text style={[styles.statPillText, styles.drawPillText]}>{rival.draws}D</Text>
-                    </View>
-                  </View>
-                </View>
-              );
-            })
-          )}
-        </View>
-
+        {/* SIGN OUT */}
         <Pressable style={styles.signOutButton} onPress={onSignOut} disabled={loadingSignOut}>
           {loadingSignOut ? <ActivityIndicator color={COLORS.error} /> : <Text style={styles.signOutText}>Sign Out</Text>}
         </Pressable>
       </ScrollView>
 
+      {/* AVATAR MODAL */}
       <Modal visible={showAvatarModal} transparent animationType="slide" onRequestClose={() => setShowAvatarModal(false)}>
         <Pressable style={styles.modalOverlay} onPress={() => !savingAvatar && setShowAvatarModal(false)}>
           <Pressable style={styles.modalContent} onPress={(e) => e.stopPropagation()}>
@@ -372,13 +494,18 @@ const styles = StyleSheet.create({
     flex: 1,
     backgroundColor: COLORS.background,
   },
+  center: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
   content: {
     padding: SPACING.screenPadding,
     paddingBottom: 40,
   },
   header: {
     alignItems: 'center',
-    marginBottom: 32,
+    marginBottom: 24,
     marginTop: 12,
   },
   avatarContainer: {
@@ -416,30 +543,36 @@ const styles = StyleSheet.create({
     fontWeight: '700',
     color: COLORS.textPrimary,
   },
-  section: {
-    marginBottom: SPACING.sectionGap,
+  memberSince: {
+    fontSize: 12,
+    color: COLORS.textMuted,
+    marginTop: 4,
   },
-  sectionTitle: {
-    fontSize: SIZES.sectionTitle,
-    fontWeight: '700',
-    color: COLORS.textPrimary,
-    marginBottom: 16,
-  },
-  statsGrid: {
-    gap: 12,
+  overallStatsCard: {
+    backgroundColor: COLORS.card,
+    borderRadius: 20,
+    marginBottom: 24,
   },
   statsRow: {
     flexDirection: 'row',
-    gap: 12,
   },
-  statCard: {
+  statsDivider: {
+    height: 1,
+    backgroundColor: COLORS.border,
+  },
+  statCell: {
     flex: 1,
-    backgroundColor: COLORS.card,
-    borderRadius: RADIUS.card,
-    borderWidth: 1,
-    borderColor: COLORS.border,
-    padding: 16,
+    paddingVertical: 16,
     alignItems: 'center',
+    justifyContent: 'center',
+  },
+  cellBorderLeft: {
+    borderLeftWidth: 1,
+    borderLeftColor: COLORS.border,
+  },
+  cellBorderRight: {
+    borderRightWidth: 1,
+    borderRightColor: COLORS.border,
   },
   statValue: {
     fontSize: 22,
@@ -448,130 +581,205 @@ const styles = StyleSheet.create({
     marginBottom: 4,
   },
   statLabel: {
-    fontSize: 12,
-    color: COLORS.textSecondary,
+    fontSize: 11,
+    color: COLORS.textMuted,
     fontWeight: '500',
   },
-  groupCard: {
+  tabSelector: {
     flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: COLORS.card,
-    borderRadius: RADIUS.card,
-    borderWidth: 1,
-    borderColor: COLORS.border,
-    padding: 16,
-    marginBottom: 12,
+    gap: 8,
+    marginBottom: 16,
   },
-  groupEmojiContainer: {
-    width: 44,
-    height: 44,
-    borderRadius: 12,
-    backgroundColor: COLORS.surface,
+  tabButton: {
+    flex: 1,
+    height: 40,
+    borderRadius: RADIUS.pill,
+    backgroundColor: COLORS.card,
     justifyContent: 'center',
     alignItems: 'center',
-    marginRight: 16,
   },
-  groupEmojiText: {
-    fontSize: 24,
+  tabButtonActive: {
+    backgroundColor: COLORS.primary,
   },
-  groupInfo: {
-    flex: 1,
-  },
-  groupName: {
-    fontSize: SIZES.cardTitle,
+  tabText: {
+    fontSize: 14,
     fontWeight: '600',
-    color: COLORS.textPrimary,
-    marginBottom: 4,
+    color: COLORS.textMuted,
   },
-  groupSubtitle: {
-    fontSize: SIZES.secondary,
-    color: COLORS.textSecondary,
+  tabTextActive: {
+    color: COLORS.textInverse,
   },
-  rivalCard: {
+  tabContent: {
+    minHeight: 300,
+  },
+  emptyText: {
+    textAlign: 'center',
+    color: COLORS.textMuted,
+    fontSize: 14,
+    marginTop: 32,
+  },
+  recentCard: {
+    backgroundColor: COLORS.card,
+    borderRadius: 14,
+    marginBottom: 8,
+    flexDirection: 'row',
+    overflow: 'hidden',
+  },
+  resultIndicator: {
+    width: 4,
+  },
+  recentContent: {
+    flex: 1,
+    padding: 12,
+  },
+  recentHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    marginBottom: 8,
+  },
+  recentGroupText: {
+    fontSize: 11,
+    color: COLORS.textMuted,
+    fontWeight: '500',
+  },
+  recentTimeText: {
+    fontSize: 11,
+    color: COLORS.textMuted,
+  },
+  recentScoreboard: {
     flexDirection: 'row',
     alignItems: 'center',
+    justifyContent: 'space-between',
+  },
+  recentPlayerText: {
+    flex: 1,
+    fontSize: 14,
+  },
+  recentScoreWrapper: {
+    paddingHorizontal: 12,
+  },
+  recentScoreText: {
+    fontSize: 16,
+    fontWeight: '800',
+    color: COLORS.primary,
+  },
+  gameStatCard: {
     backgroundColor: COLORS.card,
-    borderRadius: 20,
-    padding: 16,
+    borderRadius: 14,
+    padding: 14,
+    marginBottom: 8,
+  },
+  gameStatTitle: {
+    fontSize: 15,
+    fontWeight: '600',
+    color: COLORS.textPrimary,
     marginBottom: 12,
-    borderWidth: 1,
-    borderColor: COLORS.border,
+  },
+  gameStatRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    marginBottom: 12,
+  },
+  gameStatCol: {
+    alignItems: 'center',
+  },
+  gameStatVal: {
+    fontSize: 16,
+    fontWeight: '700',
+    color: COLORS.textPrimary,
+    marginBottom: 2,
+  },
+  gameStatLbl: {
+    fontSize: 11,
+    color: COLORS.textMuted,
+  },
+  progressBarBg: {
+    height: 4,
+    backgroundColor: COLORS.border,
+    borderRadius: 2,
+    overflow: 'hidden',
+    width: '100%',
+  },
+  progressBarFill: {
+    height: '100%',
+    backgroundColor: COLORS.primary,
+  },
+  rivalCard: {
+    backgroundColor: COLORS.card,
+    borderRadius: 14,
+    padding: 14,
+    marginBottom: 8,
+  },
+  rivalTopRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: 12,
   },
   rivalAvatar: {
-    width: 44,
-    height: 44,
-    borderRadius: 22,
+    width: 40,
+    height: 40,
+    borderRadius: 20,
     justifyContent: 'center',
     alignItems: 'center',
     marginRight: 12,
   },
   rivalAvatarText: {
     fontSize: 18,
-    fontWeight: '700',
-    color: COLORS.textPrimary,
   },
   rivalInfo: {
     flex: 1,
   },
   rivalName: {
-    fontSize: 17,
-    fontWeight: '600',
+    fontSize: 16,
+    fontWeight: '500',
     color: COLORS.textPrimary,
     marginBottom: 2,
   },
   rivalSubtitle: {
-    fontSize: 14,
+    fontSize: 13,
     color: COLORS.textMuted,
   },
   rivalBadges: {
     flexDirection: 'row',
-    gap: 6,
+    gap: 4,
   },
   statPill: {
-    paddingHorizontal: 8,
-    paddingVertical: 4,
-    borderRadius: 8,
-    minWidth: 32,
+    paddingHorizontal: 6,
+    paddingVertical: 2,
+    borderRadius: 6,
+    minWidth: 28,
     alignItems: 'center',
   },
-  statPillText: {
-    fontSize: 13,
-    fontWeight: '600',
+  winPill: { backgroundColor: COLORS.successMuted },
+  winPillText: { color: COLORS.success, fontSize: 11, fontWeight: '700' },
+  lossPill: { backgroundColor: COLORS.errorMuted },
+  lossPillText: { color: COLORS.error, fontSize: 11, fontWeight: '700' },
+  drawPill: { backgroundColor: COLORS.warningMuted },
+  drawPillText: { color: COLORS.warning, fontSize: 11, fontWeight: '700' },
+  stackedBar: {
+    height: 3,
+    borderRadius: 2,
+    flexDirection: 'row',
+    overflow: 'hidden',
+    width: '100%',
   },
-  winPill: {
-    backgroundColor: COLORS.successMuted,
-  },
-  winPillText: {
-    color: COLORS.success,
-  },
-  lossPill: {
-    backgroundColor: COLORS.errorMuted,
-  },
-  lossPillText: {
-    color: COLORS.error,
-  },
-  drawPill: {
-    backgroundColor: COLORS.warningMuted,
-  },
-  drawPillText: {
-    color: COLORS.warning,
+  barSegment: {
+    height: '100%',
   },
   signOutButton: {
-    height: 52,
-    backgroundColor: COLORS.surface,
-    borderRadius: RADIUS.button,
+    height: 48,
+    backgroundColor: 'transparent',
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: COLORS.error,
     justifyContent: 'center',
     alignItems: 'center',
-    marginTop: 8,
+    marginTop: 24,
   },
   signOutText: {
     color: COLORS.error,
     fontSize: 16,
-    fontWeight: '700',
-  },
-  mutedText: {
-    fontSize: 14,
-    color: COLORS.textMuted,
+    fontWeight: '600',
   },
   modalOverlay: {
     flex: 1,

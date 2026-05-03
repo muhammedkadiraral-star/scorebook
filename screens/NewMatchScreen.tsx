@@ -231,11 +231,14 @@ export function NewMatchScreen({ groupId, groupName, members: initialMembers, on
       const recorderName = members.find(m => m.id === authUser.id)?.displayName ?? 'Someone';
       const homePlayerName = selectedHomePlayer?.displayName ?? 'Home Player';
       const awayPlayerName = selectedAwayPlayer?.displayName ?? 'Away Player';
-      const homeTeamText = homeTeam.trim() || 'No Team';
-      const awayTeamText = awayTeam.trim() || 'No Team';
+      const homeTeamStr = homeTeam.trim();
+      const awayTeamStr = awayTeam.trim();
+      const hasTeams = homeTeamStr !== '' && homeTeamStr !== 'No Team' && awayTeamStr !== '' && awayTeamStr !== 'No Team';
 
       const notifTitle = 'New Match Recorded';
-      const notifMessage = `${recorderName} recorded a match: ${homePlayerName} ${homeScore}-${awayScore} ${awayPlayerName} (${homeTeamText} vs ${awayTeamText})`;
+      const notifMessage = hasTeams
+        ? `${recorderName} recorded a match: ${homePlayerName} ${homeScore}-${awayScore} ${awayPlayerName} (${homeTeamStr} vs ${awayTeamStr})`
+        : `${recorderName} recorded a match: ${homePlayerName} ${homeScore}-${awayScore} ${awayPlayerName}`;
 
       await supabase.from('notifications').insert({
         user_id: opponentId,

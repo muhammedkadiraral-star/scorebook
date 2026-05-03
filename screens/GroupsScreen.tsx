@@ -35,19 +35,43 @@ export function GroupsScreen({ userId, onOpenGroup }: GroupsScreenProps) {
 
   const fetchGroups = useCallback(async () => {
     try {
-      const { data, error } = await supabase
-        .from('groups')
-        .select(`
-          id,
-          name,
-          game_type,
-          group_members!inner(user_id),
-          _count:group_members(count)
-        `)
-        .eq('group_members.user_id', userId);
+      const { data: myMemberships, error: memError } = await supabase
+        .from('group_members')
+        .select('group_id, groups(id, name, game_type)')
+        .eq('user_id', userId);
 
-      if (error) throw error;
-      setGroups((data ?? []) as unknown as Group[]);
+      if (memError) throw memError;
+
+      const userGroups = myMemberships
+        .map(m => m.groups)
+        .filter(Boolean) as unknown as { id: string; name: string; game_type: string }[];
+
+      if (userGroups.length === 0) {
+        setGroups([]);
+        setLoading(false);
+        setRefreshing(false);
+        return;
+      }
+
+      const groupIds = userGroups.map(g => g.id);
+      const { data: allMembers, error: allMemError } = await supabase
+        .from('group_members')
+        .select('group_id')
+        .in('group_id', groupIds);
+
+      if (allMemError) throw allMemError;
+
+      const memberCounts = allMembers.reduce((acc, curr) => {
+        acc[curr.group_id] = (acc[curr.group_id] || 0) + 1;
+        return acc;
+      }, {} as Record<string, number>);
+
+      const groupsWithCounts: Group[] = userGroups.map(g => ({
+        ...g,
+        _count: { group_members: memberCounts[g.id] || 0 }
+      }));
+
+      setGroups(groupsWithCounts);
     } catch (error) {
       const message = error instanceof Error ? error.message : 'Could not fetch groups.';
       Alert.alert('Error', message);
