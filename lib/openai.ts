@@ -1,5 +1,6 @@
 export async function analyzeMatchPhoto(base64Image: string) {
-  const apiKey = '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';
+  // TODO: Move API key to environment variable or backend proxy before production
+  const apiKey = '';
 
   const response = await fetch('https://api.openai.com/v1/chat/completions', {
     method: 'POST',
