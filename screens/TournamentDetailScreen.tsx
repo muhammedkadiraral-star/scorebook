@@ -161,7 +161,7 @@ export function TournamentDetailScreen({ userId, tournamentId, onBack }: Tournam
       };
     });
 
-    matches.filter(m => m.status === 'completed').forEach(m => {
+    matches.filter(m => m.status === 'completed' && m.score_confirmed === true).forEach(m => {
       if (!m.player_home || !m.player_away) return;
       const s1 = m.score_home ?? 0;
       const s2 = m.score_away ?? 0;
@@ -309,28 +309,133 @@ export function TournamentDetailScreen({ userId, tournamentId, onBack }: Tournam
         score_home: s1,
         score_away: s2,
         winner: s1 === s2 ? null : winnerId,
-        status: 'completed',
-        played_at: now,
+        status: 'pending_confirmation',
+        played_at: null,
         score_submitted_by: userId,
         score_submitted_at: now,
-        score_confirmed: true,
+        score_confirmed: false,
+        confirmed_by: null,
+        confirmed_at: null,
+        disputed_by: null,
+        disputed_at: null,
+        dispute_reason: null,
       }).eq('id', scoreModalMatch.id);
 
       if (matchError) throw matchError;
 
+      let opponentId = null;
+      if (userId === scoreModalMatch.player_home) {
+        opponentId = scoreModalMatch.player_away;
+      } else if (userId === scoreModalMatch.player_away) {
+        opponentId = scoreModalMatch.player_home;
+      }
+
+      const homeName = participants.find(p => p.user_id === scoreModalMatch.player_home)?.display_name ?? 'Home';
+      const awayName = participants.find(p => p.user_id === scoreModalMatch.player_away)?.display_name ?? 'Away';
+      const submitterName = participants.find(p => p.user_id === userId)?.display_name ?? 'A player';
+
+      if (opponentId) {
+        const { error: notifError } = await supabase.from('notifications').insert({
+          user_id: opponentId,
+          type: 'tournament_score_confirmation',
+          title: 'Confirm match result',
+          message: `${submitterName} submitted a result: ${homeName} ${s1} - ${s2} ${awayName}.`,
+          tournament_match_id: scoreModalMatch.id,
+          match_id: null,
+          group_id: null,
+          created_by: userId,
+          is_read: false
+        } as any);
+        
+        if (notifError) console.error('Notification insert error:', notifError);
+      } else {
+        const notifPayloads = [];
+        if (scoreModalMatch.player_home && scoreModalMatch.player_home !== userId) {
+          notifPayloads.push({
+            user_id: scoreModalMatch.player_home,
+            type: 'tournament_score_confirmation',
+            title: 'Confirm match result',
+            message: `${submitterName} submitted a result: ${homeName} ${s1} - ${s2} ${awayName}.`,
+            tournament_match_id: scoreModalMatch.id,
+            match_id: null,
+            group_id: null,
+            created_by: userId,
+            is_read: false
+          });
+        }
+        if (scoreModalMatch.player_away && scoreModalMatch.player_away !== userId) {
+          notifPayloads.push({
+            user_id: scoreModalMatch.player_away,
+            type: 'tournament_score_confirmation',
+            title: 'Confirm match result',
+            message: `${submitterName} submitted a result: ${homeName} ${s1} - ${s2} ${awayName}.`,
+            tournament_match_id: scoreModalMatch.id,
+            match_id: null,
+            group_id: null,
+            created_by: userId,
+            is_read: false
+          });
+        }
+        
+        if (notifPayloads.length > 0) {
+          const { error: notifError } = await supabase.from('notifications').insert(notifPayloads as any);
+          if (notifError) console.error('Notification insert error:', notifError);
+        }
+      }
+
+      setScoreModalMatch(null);
+      loadData();
+      Alert.alert('Result submitted', 'Waiting for opponent confirmation.');
+    } catch (error) {
+      console.error('Save score error:', error);
+      Alert.alert('Error', 'Could not save score.');
+    } finally {
+      setSavingScore(false);
+    }
+  };
+
+  const handleConfirmResult = async (match: TournamentMatch) => {
+    try {
+      const now = new Date().toISOString();
+      const { error: matchError } = await supabase.from('tournament_matches').update({
+        status: 'completed',
+        score_confirmed: true,
+        confirmed_by: userId,
+        confirmed_at: now,
+        played_at: now,
+      }).eq('id', match.id);
+
+      if (matchError) throw matchError;
+
+      const opponentName = participants.find(p => p.user_id === userId)?.display_name ?? 'The opponent';
+
+      if (match.score_submitted_by) {
+        const { error: notifError } = await supabase.from('notifications').insert({
+          user_id: match.score_submitted_by,
+          type: 'tournament_score_confirmed',
+          title: 'Result confirmed',
+          message: `${opponentName} confirmed the match result.`,
+          tournament_match_id: match.id,
+          match_id: null,
+          group_id: null,
+          created_by: userId,
+          is_read: false
+        } as any);
+        if (notifError) console.error('Notification insert error:', notifError);
+      }
+
       if (tournament?.format === 'knockout') {
-        // Knockout logic: advance winners
-        const currentRound = scoreModalMatch.round;
+        const currentRound = match.round;
         const { data: roundMatches } = await supabase
           .from('tournament_matches')
           .select('*')
           .eq('tournament_id', tournamentId)
           .eq('round', currentRound);
 
-        const allCompleted = (roundMatches ?? []).every(m => m.status === 'completed' || m.id === scoreModalMatch.id);
+        const allCompleted = (roundMatches ?? []).every(m => (m.status === 'completed' && m.score_confirmed) || m.id === match.id);
         
         if (allCompleted) {
-          const winners = (roundMatches ?? []).map(m => m.id === scoreModalMatch.id ? winnerId : m.winner);
+          const winners = (roundMatches ?? []).map(m => m.id === match.id ? match.winner : m.winner);
           if (winners.length > 1) {
             const nextMatches = [];
             for (let i = 0; i < winners.length / 2; i++) {
@@ -349,20 +454,53 @@ export function TournamentDetailScreen({ userId, tournamentId, onBack }: Tournam
           }
         }
       } else {
-        // League logic: check if all matches finished
-        const { data: allMatches } = await supabase.from('tournament_matches').select('id, status').eq('tournament_id', tournamentId);
-        const allDone = (allMatches ?? []).every(m => m.status === 'completed' || m.id === scoreModalMatch.id);
+        const { data: allMatches } = await supabase.from('tournament_matches').select('id, status, score_confirmed').eq('tournament_id', tournamentId);
+        const allDone = (allMatches ?? []).every(m => (m.status === 'completed' && m.score_confirmed) || m.id === match.id);
         if (allDone) {
           await supabase.from('tournaments').update({ status: 'completed' }).eq('id', tournamentId);
         }
       }
 
-      setScoreModalMatch(null);
       loadData();
     } catch (error) {
-      Alert.alert('Error', 'Could not save score.');
-    } finally {
-      setSavingScore(false);
+      console.error('Confirm error:', error);
+      Alert.alert('Error', 'Could not confirm result.');
+    }
+  };
+
+  const handleDisputeResult = async (match: TournamentMatch) => {
+    try {
+      const now = new Date().toISOString();
+      const { error: matchError } = await supabase.from('tournament_matches').update({
+        status: 'disputed',
+        score_confirmed: false,
+        disputed_by: userId,
+        disputed_at: now,
+      }).eq('id', match.id);
+
+      if (matchError) throw matchError;
+
+      const opponentName = participants.find(p => p.user_id === userId)?.display_name ?? 'The opponent';
+
+      if (match.score_submitted_by) {
+        const { error: notifError } = await supabase.from('notifications').insert({
+          user_id: match.score_submitted_by,
+          type: 'tournament_score_disputed',
+          title: 'Result disputed',
+          message: `${opponentName} disputed the match result. Please review and resubmit.`,
+          tournament_match_id: match.id,
+          match_id: null,
+          group_id: null,
+          created_by: userId,
+          is_read: false
+        } as any);
+        if (notifError) console.error('Notification insert error:', notifError);
+      }
+
+      loadData();
+    } catch (error) {
+      console.error('Dispute error:', error);
+      Alert.alert('Error', 'Could not dispute result.');
     }
   };
 
@@ -459,22 +597,107 @@ export function TournamentDetailScreen({ userId, tournamentId, onBack }: Tournam
     const isMyMatch = (item.player_home === userId || item.player_away === userId) && item.status === 'pending';
     const isWinner1 = item.winner === item.player_home;
     const isWinner2 = item.winner === item.player_away;
+    const isCompleted = item.status === 'completed';
+    const isPendingConfirmation = item.status === 'pending_confirmation';
+    const isDisputed = item.status === 'disputed';
+    const hasScores = isCompleted || isPendingConfirmation || isDisputed;
+
+    let submitterId = item.score_submitted_by;
+    let opponentId = null;
+    if (submitterId === item.player_home) opponentId = item.player_away;
+    else if (submitterId === item.player_away) opponentId = item.player_home;
+
+    const isSubmitter = userId === submitterId;
+    const isConfirmationOpponent = userId === opponentId;
 
     return (
       <View key={item.id} style={styles.matchCard}>
-        <View style={styles.matchRow}>
-          <Text style={[styles.matchPlayer, isWinner1 && styles.matchWinner]}>{p1?.display_name ?? 'TBD'}</Text>
-          <Text style={styles.matchScore}>{item.status === 'completed' ? item.score_home : '-'}</Text>
+        {isCompleted && (
+          <View style={styles.matchStatusBadge}>
+            <Text style={styles.matchStatusText}>Completed</Text>
+          </View>
+        )}
+        {isPendingConfirmation && (
+          <View style={[styles.matchStatusBadge, { backgroundColor: COLORS.surface }]}>
+            <Text style={[styles.matchStatusText, { color: COLORS.warning }]}>Pending Confirmation</Text>
+          </View>
+        )}
+        {isDisputed && (
+          <View style={[styles.matchStatusBadge, { backgroundColor: COLORS.surface }]}>
+            <Text style={[styles.matchStatusText, { color: COLORS.error }]}>Disputed</Text>
+          </View>
+        )}
+
+        <View style={styles.matchContent}>
+          <View style={styles.matchPlayersCol}>
+            <Text style={[styles.matchPlayer, isWinner1 && isCompleted && styles.matchWinner]} numberOfLines={1}>{p1?.display_name ?? 'TBD'}</Text>
+            <Text style={[styles.matchPlayer, isWinner2 && isCompleted && styles.matchWinner]} numberOfLines={1}>{p2?.display_name ?? 'TBD'}</Text>
+          </View>
+          <View style={styles.matchScoresCol}>
+            <Text style={[styles.matchScore, isWinner1 && isCompleted && styles.matchWinner]}>{hasScores ? item.score_home : '-'}</Text>
+            <Text style={[styles.matchScore, isWinner2 && isCompleted && styles.matchWinner]}>{hasScores ? item.score_away : '-'}</Text>
+          </View>
         </View>
-        <View style={styles.matchDivider} />
-        <View style={styles.matchRow}>
-          <Text style={[styles.matchPlayer, isWinner2 && styles.matchWinner]}>{p2?.display_name ?? 'TBD'}</Text>
-          <Text style={styles.matchScore}>{item.status === 'completed' ? item.score_away : '-'}</Text>
-        </View>
-        {isMyMatch && (
-          <Pressable style={styles.scoreAction} onPress={() => { setScoreModalMatch(item); setScoreHome(''); setScoreAway(''); }}>
-            <Text style={styles.scoreActionText}>Enter Score</Text>
-          </Pressable>
+
+        {isPendingConfirmation && (
+          <View style={styles.matchActionContainer}>
+            {isConfirmationOpponent ? (
+              <View style={{ flexDirection: 'row', gap: 8 }}>
+                <Pressable style={[styles.scoreAction, { flex: 1, backgroundColor: COLORS.success }]} onPress={() => {
+                  Alert.alert('Confirm result?', 'This will finalize the match result.', [
+                    { text: 'Cancel', style: 'cancel' },
+                    { text: 'Confirm', style: 'default', onPress: () => handleConfirmResult(item) }
+                  ]);
+                }}>
+                  <Text style={[styles.scoreActionText, { color: COLORS.textInverse }]}>Confirm</Text>
+                </Pressable>
+                <Pressable style={[styles.scoreAction, { flex: 1, backgroundColor: COLORS.error }]} onPress={() => {
+                  Alert.alert('Dispute result?', 'The submitter will be notified and can edit the score.', [
+                    { text: 'Cancel', style: 'cancel' },
+                    { text: 'Dispute', style: 'destructive', onPress: () => handleDisputeResult(item) }
+                  ]);
+                }}>
+                  <Text style={[styles.scoreActionText, { color: COLORS.textInverse }]}>Dispute</Text>
+                </Pressable>
+              </View>
+            ) : isSubmitter ? (
+              <View style={styles.passiveAction}>
+                <Text style={styles.passiveActionText}>Waiting for opponent confirmation</Text>
+              </View>
+            ) : (
+              <View style={styles.passiveAction}>
+                <Text style={styles.passiveActionText}>Pending confirmation</Text>
+              </View>
+            )}
+          </View>
+        )}
+
+        {isDisputed && (
+          <View style={styles.matchActionContainer}>
+            {isSubmitter ? (
+              <Pressable style={styles.scoreAction} onPress={() => { setScoreModalMatch(item); setScoreHome(item.score_home?.toString() || ''); setScoreAway(item.score_away?.toString() || ''); }}>
+                <Text style={styles.scoreActionText}>Resubmit Score</Text>
+              </Pressable>
+            ) : (
+              <View style={styles.passiveAction}>
+                <Text style={styles.passiveActionText}>Waiting for updated result.</Text>
+              </View>
+            )}
+          </View>
+        )}
+
+        {item.status === 'pending' && (
+          <View style={styles.matchActionContainer}>
+            {isMyMatch ? (
+              <Pressable style={styles.scoreAction} onPress={() => { setScoreModalMatch(item); setScoreHome(''); setScoreAway(''); }}>
+                <Text style={styles.scoreActionText}>Enter Score</Text>
+              </Pressable>
+            ) : (
+              <View style={styles.passiveAction}>
+                <Text style={styles.passiveActionText}>Waiting for players...</Text>
+              </View>
+            )}
+          </View>
         )}
       </View>
     );
@@ -804,14 +1027,20 @@ const styles = StyleSheet.create({
   championRow: { backgroundColor: COLORS.warningMuted, borderRadius: 8 },
   tableCol: { flex: 1, fontSize: 12, color: COLORS.textSecondary, textAlign: 'center' },
   matchesTitle: { fontSize: 16, fontWeight: '700', marginTop: 16 },
-  matchCard: { padding: 12, backgroundColor: COLORS.card, borderRadius: 12, borderWidth: 1, borderColor: COLORS.border, marginBottom: 8 },
-  matchRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
-  matchPlayer: { fontSize: 14, color: COLORS.textSecondary },
-  matchWinner: { fontWeight: '700', color: COLORS.success },
-  matchScore: { fontSize: 16, fontWeight: '800', color: COLORS.textPrimary },
-  matchDivider: { height: 1, backgroundColor: COLORS.surface, marginVertical: 8 },
-  scoreAction: { marginTop: 8, paddingVertical: 6, backgroundColor: COLORS.surface, borderRadius: 8, alignItems: 'center' },
-  scoreActionText: { fontSize: 12, fontWeight: '700', color: COLORS.primary },
+  matchCard: { padding: 16, backgroundColor: COLORS.card, borderRadius: 16, borderWidth: 1, borderColor: COLORS.border, marginBottom: 12 },
+  matchStatusBadge: { alignSelf: 'flex-start', backgroundColor: COLORS.surface, paddingHorizontal: 8, paddingVertical: 4, borderRadius: 6, marginBottom: 12 },
+  matchStatusText: { fontSize: 10, fontWeight: '700', color: COLORS.textMuted, textTransform: 'uppercase' },
+  matchContent: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
+  matchPlayersCol: { flex: 1, gap: 12 },
+  matchScoresCol: { alignItems: 'flex-end', gap: 12, paddingLeft: 16 },
+  matchPlayer: { fontSize: 16, fontWeight: '600', color: COLORS.textSecondary },
+  matchWinner: { color: COLORS.success, fontWeight: '700' },
+  matchScore: { fontSize: 20, fontWeight: '800', color: COLORS.textPrimary },
+  matchActionContainer: { marginTop: 16, paddingTop: 16, borderTopWidth: 1, borderTopColor: COLORS.surface },
+  scoreAction: { backgroundColor: COLORS.primaryMuted, paddingVertical: 10, borderRadius: 10, alignItems: 'center' },
+  scoreActionText: { fontSize: 14, fontWeight: '700', color: COLORS.primary },
+  passiveAction: { alignItems: 'center', paddingVertical: 8 },
+  passiveActionText: { fontSize: 13, color: COLORS.textMuted, fontStyle: 'italic' },
   roundGroup: { marginTop: 16, gap: 8 },
   roundLabel: { fontSize: 11, fontWeight: '800', color: COLORS.textMuted, letterSpacing: 1, marginBottom: 4 },
   emptyText: { textAlign: 'center', marginTop: 40, color: COLORS.textMuted },
