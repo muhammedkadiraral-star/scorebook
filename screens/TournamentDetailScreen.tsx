@@ -45,6 +45,8 @@ type Tournament = {
   round_deadline_hours?: number;
   estimated_completion?: string | null;
   started_at?: string | null;
+  winner_id?: string | null;
+  completed_at?: string | null;
 };
 
 type Participant = {
@@ -258,6 +260,65 @@ export function TournamentDetailScreen({ userId, tournamentId, onBack }: Tournam
                     return;
                   }
                 }
+              } else if (tournament.format === 'knockout') {
+                const len = participants.length;
+                if ((len & (len - 1)) !== 0) {
+                  Alert.alert('Cannot start', 'Knockout format currently requires participant count to be a power of 2 (e.g. 4, 8, 16).');
+                  setStarting(false);
+                  return;
+                }
+
+                const { data: existingMatches, error: checkError } = await supabase
+                  .from('tournament_matches')
+                  .select('id')
+                  .eq('tournament_id', tournamentId)
+                  .limit(1);
+
+                if (checkError) {
+                  console.error('Check match error', checkError);
+                  Alert.alert('Error', 'Could not check existing matches.');
+                  return;
+                }
+
+                if (!existingMatches || existingMatches.length === 0) {
+                  const deadlineDate = new Date(Date.now() + (tournament.round_deadline_hours || 24) * 60 * 60 * 1000).toISOString();
+                  
+                  const sortedParticipants = [...participants].sort((a, b) => {
+                    if (a.seed !== null && a.seed !== undefined && b.seed !== null && b.seed !== undefined) return a.seed - b.seed;
+                    if (a.seed !== null && a.seed !== undefined) return -1;
+                    if (b.seed !== null && b.seed !== undefined) return 1;
+                    const aTime = a.joined_at ? new Date(a.joined_at).getTime() : 0;
+                    const bTime = b.joined_at ? new Date(b.joined_at).getTime() : 0;
+                    return aTime - bTime;
+                  });
+
+                  const newMatches = [];
+                  const n = sortedParticipants.length;
+                  for (let i = 0; i < n / 2; i++) {
+                    newMatches.push({
+                      tournament_id: tournamentId,
+                      round: 1,
+                      match_order: i + 1,
+                      player_home: sortedParticipants[i].user_id,
+                      player_away: sortedParticipants[n - 1 - i].user_id,
+                      score_home: null,
+                      score_away: null,
+                      winner: null,
+                      status: 'pending',
+                      deadline: deadlineDate
+                    });
+                  }
+
+                  const { error: insertError } = await supabase
+                    .from('tournament_matches')
+                    .insert(newMatches);
+
+                  if (insertError) {
+                    console.error('Insert match error', insertError);
+                    Alert.alert('Error', 'Could not generate knockout bracket.');
+                    return;
+                  }
+                }
               }
 
               const { error: tError } = await supabase
@@ -450,7 +511,11 @@ export function TournamentDetailScreen({ userId, tournamentId, onBack }: Tournam
             }
             await supabase.from('tournament_matches').insert(nextMatches);
           } else {
-            await supabase.from('tournaments').update({ status: 'completed' }).eq('id', tournamentId);
+            await supabase.from('tournaments').update({ 
+              status: 'completed',
+              winner_id: match.winner,
+              completed_at: new Date().toISOString()
+            }).eq('id', tournamentId);
           }
         }
       } else {
@@ -789,6 +854,16 @@ export function TournamentDetailScreen({ userId, tournamentId, onBack }: Tournam
           </Pressable>
         )}
 
+        {/* Champion UI */}
+        {tournament?.status === 'completed' && tournament.winner_id && (
+          <View style={[styles.infoCard, { marginTop: 0, paddingVertical: 16, alignItems: 'center', borderColor: COLORS.warning, borderWidth: 1 }]}>
+            <Text style={{ fontSize: 13, fontWeight: '700', color: COLORS.warning, letterSpacing: 1, marginBottom: 4 }}>🏆 CHAMPION</Text>
+            <Text style={{ fontSize: 20, fontWeight: '800', color: COLORS.textPrimary }}>
+              {participants.find(p => p.user_id === tournament.winner_id)?.display_name ?? 'Champion selected'}
+            </Text>
+          </View>
+        )}
+
         {/* Tabs */}
         <View style={styles.tabs}>
           <Pressable style={[styles.tab, activeTab === 'bracket' && styles.tabActive]} onPress={() => setActiveTab('bracket')}>
@@ -863,16 +938,28 @@ export function TournamentDetailScreen({ userId, tournamentId, onBack }: Tournam
             ) : (
               tournament?.format === 'knockout' ? (
                 <View style={styles.bracketContainer}>
-                  {[1, 2, 3].map(round => {
-                    const roundMatches = matches.filter(m => m.round === round);
-                    if (roundMatches.length === 0) return null;
-                    return (
-                      <View key={round} style={styles.roundGroup}>
-                        <Text style={styles.roundLabel}>{round === 1 ? 'QUARTER FINALS' : round === 2 ? 'SEMI FINALS' : 'FINAL'}</Text>
-                        {roundMatches.map(m => <View key={m.id}>{renderMatchCard(m)}</View>)}
-                      </View>
-                    );
-                  })}
+                  {(() => {
+                    const maxRound = Math.max(...matches.map(m => m.round), 1);
+                    const roundsArray = Array.from({ length: maxRound }, (_, i) => i + 1);
+                    
+                    return roundsArray.map(round => {
+                      const roundMatches = matches.filter(m => m.round === round);
+                      if (roundMatches.length === 0) return null;
+
+                      let label = `ROUND ${round}`;
+                      if (roundMatches.length === 1) label = 'FINAL';
+                      else if (roundMatches.length === 2) label = 'SEMI FINALS';
+                      else if (roundMatches.length === 4) label = 'QUARTER FINALS';
+                      else if (roundMatches.length === 8) label = 'ROUND OF 16';
+
+                      return (
+                        <View key={round} style={styles.roundGroup}>
+                          <Text style={styles.roundLabel}>{label}</Text>
+                          {roundMatches.map(m => <View key={m.id}>{renderMatchCard(m)}</View>)}
+                        </View>
+                      );
+                    });
+                  })()}
                 </View>
               ) : (
                 <View style={styles.leagueMatches}>
