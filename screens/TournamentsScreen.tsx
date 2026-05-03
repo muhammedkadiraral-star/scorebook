@@ -15,6 +15,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { supabase } from '../lib/supabase';
 import { COLORS, RADIUS, SIZES, SPACING } from '../constants/theme';
 import { GAMES, getGameDisplayName, getGameEmoji } from '../constants/games';
+import { FeedbackModal, FeedbackType } from '../components/FeedbackModal';
 
 type Tournament = {
   id: string;
@@ -27,6 +28,7 @@ type Tournament = {
   is_public: boolean;
   created_by: string;
   creator_name?: string;
+  invite_code?: string;
 };
 
 type TournamentsScreenProps = {
@@ -40,6 +42,7 @@ export function TournamentsScreen({ userId, onOpenTournament }: TournamentsScree
   const [loading, setLoading] = useState(true);
   const [searchText, setSearchText] = useState('');
   const [selectedGameFilter, setSelectedGameFilter] = useState('All');
+  const [feedback, setFeedback] = useState<{ visible: boolean; type: FeedbackType; title: string; message: string; onPrimaryPress?: () => void } | null>(null);
 
   const fetchTournaments = useCallback(async () => {
     setLoading(true);
@@ -116,6 +119,8 @@ export function TournamentsScreen({ userId, onOpenTournament }: TournamentsScree
           };
           onOpenTournament(formatted as Tournament);
           setSearchText('');
+        } else {
+            setFeedback({ visible: true, type: 'error', title: 'Invalid code', message: 'No tournament found with this code.' });
         }
       } catch (error) {
         console.error('Error searching by code:', error);
@@ -140,17 +145,68 @@ export function TournamentsScreen({ userId, onOpenTournament }: TournamentsScree
   }, [openTournaments, searchText, selectedGameFilter]);
 
   const joinTournament = async (t: Tournament) => {
+    if (t.status === 'in_progress') {
+      setFeedback({ visible: true, type: 'warning', title: 'Tournament already started', message: 'You can no longer join this tournament because it has already started.' });
+      return;
+    }
+    if (t.status === 'completed') {
+      setFeedback({ visible: true, type: 'warning', title: 'Tournament completed', message: 'You can no longer join this tournament because it has already ended.' });
+      return;
+    }
+    if (t.status !== 'open') {
+      setFeedback({ visible: true, type: 'error', title: 'Cannot join', message: 'This tournament is not open for joining.' });
+      return;
+    }
+
     try {
-      const { error } = await supabase.from('tournament_participants').insert({
-        tournament_id: t.id,
-        user_id: userId,
-        seed: t.current_participants + 1,
+      const { data, error: rpcError } = await supabase.rpc('join_tournament_by_invite_code', {
+        p_invite_code: t.invite_code
       });
-      if (error) throw error;
-      fetchTournaments();
+
+      if (rpcError || (data && data.success === false)) {
+        if (rpcError) console.error('Join tournament RPC error:', rpcError);
+        
+        if (data?.error === 'already_started') {
+          setFeedback({ visible: true, type: 'warning', title: "Tournament already started", message: data?.message || "You can no longer join this tournament because it has already started." });
+        } else if (data?.error === 'completed') {
+          setFeedback({ visible: true, type: 'warning', title: "Tournament completed", message: data?.message || "You can no longer join this tournament because it has already ended." });
+        } else if (data?.error === 'not_found') {
+          setFeedback({ visible: true, type: 'error', title: "Invalid code", message: data?.message || "Check the invite code and try again." });
+        } else if (data?.error === 'full') {
+          setFeedback({ visible: true, type: 'warning', title: "Tournament full", message: data?.message || "This tournament has reached its maximum capacity." });
+        } else {
+          setFeedback({ visible: true, type: 'error', title: "Could not join tournament", message: data?.message || rpcError?.message || "Please try again." });
+        }
+        return;
+      }
+
+      if (data?.success === true) {
+        if (data.already_joined) {
+          setFeedback({
+            visible: true,
+            type: 'info',
+            title: 'Already Joined',
+            message: 'You are already in this tournament.',
+            onPrimaryPress: () => {
+              setFeedback(null);
+            }
+          });
+        } else {
+          setFeedback({
+            visible: true,
+            type: 'success',
+            title: 'Success',
+            message: `You have joined "${data.tournament_name}"!`,
+            onPrimaryPress: () => {
+              setFeedback(null);
+              fetchTournaments();
+            }
+          });
+        }
+      }
     } catch (error) {
       const message = error instanceof Error ? error.message : 'Could not join tournament.';
-      Alert.alert('Error', message);
+      setFeedback({ visible: true, type: 'error', title: 'Error', message });
     }
   };
 

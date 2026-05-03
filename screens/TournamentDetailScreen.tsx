@@ -21,6 +21,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { supabase } from '../lib/supabase';
 import { COLORS, RADIUS, SIZES, SPACING } from '../constants/theme';
 import { getGameDisplayName, getGameEmoji } from '../constants/games';
+import { FeedbackModal, FeedbackType } from '../components/FeedbackModal';
 
 type TournamentDetailScreenProps = {
   userId: string;
@@ -106,6 +107,16 @@ export function TournamentDetailScreen({ userId, tournamentId, onBack }: Tournam
   const [savingScore, setSavingScore] = useState(false);
   const [starting, setStarting] = useState(false);
   const [deleting, setDeleting] = useState(false);
+  const [feedback, setFeedback] = useState<{ 
+    visible: boolean; 
+    type: FeedbackType; 
+    title: string; 
+    message: string; 
+    primaryButtonText?: string;
+    secondaryButtonText?: string;
+    onPrimaryPress?: () => void; 
+    onSecondaryPress?: () => void;
+  } | null>(null);
 
   const loadData = useCallback(async () => {
     setLoading(true);
@@ -446,10 +457,10 @@ export function TournamentDetailScreen({ userId, tournamentId, onBack }: Tournam
 
       setScoreModalMatch(null);
       loadData();
-      Alert.alert('Result submitted', 'Waiting for opponent confirmation.');
+      setFeedback({ visible: true, type: 'success', title: 'Result submitted', message: 'Waiting for opponent confirmation.' });
     } catch (error) {
       console.error('Save score error:', error);
-      Alert.alert('Error', 'Could not save score.');
+      setFeedback({ visible: true, type: 'error', title: 'Error', message: 'Could not save score.' });
     } finally {
       setSavingScore(false);
     }
@@ -709,18 +720,36 @@ export function TournamentDetailScreen({ userId, tournamentId, onBack }: Tournam
             {isConfirmationOpponent ? (
               <View style={{ flexDirection: 'row', gap: 8 }}>
                 <Pressable style={[styles.scoreAction, { flex: 1, backgroundColor: COLORS.success }]} onPress={() => {
-                  Alert.alert('Confirm result?', 'This will finalize the match result.', [
-                    { text: 'Cancel', style: 'cancel' },
-                    { text: 'Confirm', style: 'default', onPress: () => handleConfirmResult(item) }
-                  ]);
+                  setFeedback({
+                    visible: true,
+                    type: 'info',
+                    title: 'Confirm result?',
+                    message: 'This will finalize the match result.',
+                    primaryButtonText: 'Confirm',
+                    secondaryButtonText: 'Cancel',
+                    onPrimaryPress: () => {
+                      setFeedback(null);
+                      handleConfirmResult(item);
+                    },
+                    onSecondaryPress: () => setFeedback(null)
+                  });
                 }}>
                   <Text style={[styles.scoreActionText, { color: COLORS.textInverse }]}>Confirm</Text>
                 </Pressable>
                 <Pressable style={[styles.scoreAction, { flex: 1, backgroundColor: COLORS.error }]} onPress={() => {
-                  Alert.alert('Dispute result?', 'The submitter will be notified and can edit the score.', [
-                    { text: 'Cancel', style: 'cancel' },
-                    { text: 'Dispute', style: 'destructive', onPress: () => handleDisputeResult(item) }
-                  ]);
+                  setFeedback({
+                    visible: true,
+                    type: 'warning',
+                    title: 'Dispute result?',
+                    message: 'The submitter will be notified and can edit the score.',
+                    primaryButtonText: 'Dispute',
+                    secondaryButtonText: 'Cancel',
+                    onPrimaryPress: () => {
+                      setFeedback(null);
+                      handleDisputeResult(item);
+                    },
+                    onSecondaryPress: () => setFeedback(null)
+                  });
                 }}>
                   <Text style={[styles.scoreActionText, { color: COLORS.textInverse }]}>Dispute</Text>
                 </Pressable>
@@ -1067,6 +1096,18 @@ export function TournamentDetailScreen({ userId, tournamentId, onBack }: Tournam
           </View>
         </Pressable>
       </Modal>
+
+      <FeedbackModal
+        visible={feedback?.visible || false}
+        type={feedback?.type || 'info'}
+        title={feedback?.title || ''}
+        message={feedback?.message || ''}
+        primaryButtonText={feedback?.primaryButtonText}
+        secondaryButtonText={feedback?.secondaryButtonText}
+        onPrimaryPress={feedback?.onPrimaryPress || (() => setFeedback(null))}
+        onSecondaryPress={feedback?.onSecondaryPress}
+        onClose={() => setFeedback(null)}
+      />
     </SafeAreaView>
   );
 }

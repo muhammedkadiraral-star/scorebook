@@ -8,6 +8,10 @@ import {
   Text,
   TextInput,
   View,
+  KeyboardAvoidingView,
+  Platform,
+  TouchableWithoutFeedback,
+  Keyboard,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { supabase } from '../lib/supabase';
@@ -89,37 +93,47 @@ type JoinGroupRpcResponse = {
 
   return (
     <Modal visible={visible} transparent animationType="slide" onRequestClose={onClose}>
-      <Pressable style={styles.overlay} onPress={onClose}>
-        <Pressable style={styles.content} onPress={(e) => e.stopPropagation()}>
-          <View style={styles.header}>
-            <Text style={styles.title}>Join Group</Text>
-            <Pressable onPress={onClose}>
-              <Ionicons name="close" size={24} color={COLORS.textSecondary} />
+      <KeyboardAvoidingView
+        style={styles.overlay}
+        behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+      >
+        <TouchableWithoutFeedback onPress={Keyboard.dismiss}>
+          <View style={styles.overlayBackground}>
+            <Pressable style={StyleSheet.absoluteFill} onPress={onClose} />
+            <Pressable style={styles.content} onPress={(e) => e.stopPropagation()}>
+              <View style={styles.header}>
+                <Text style={styles.title}>Join Group</Text>
+                <Pressable onPress={onClose}>
+                  <Ionicons name="close" size={24} color={COLORS.textSecondary} />
+                </Pressable>
+              </View>
+
+              <View style={styles.form}>
+                <Text style={styles.label}>Invite Code</Text>
+                <TextInput
+                  value={code}
+                  onChangeText={setCode}
+                  placeholder="e.g. AB1234"
+                  placeholderTextColor={COLORS.textMuted}
+                  autoCapitalize="characters"
+                  autoCorrect={false}
+                  returnKeyType="done"
+                  onSubmitEditing={Keyboard.dismiss}
+                  style={styles.input}
+                />
+
+                <Pressable
+                  style={[styles.joinButton, (!code.trim() || loading) && styles.disabledButton]}
+                  onPress={handleJoin}
+                  disabled={!code.trim() || loading}
+                >
+                  {loading ? <ActivityIndicator color={COLORS.textInverse} /> : <Text style={styles.joinButtonText}>Join Group</Text>}
+                </Pressable>
+              </View>
             </Pressable>
           </View>
-
-          <View style={styles.form}>
-            <Text style={styles.label}>Invite Code</Text>
-            <TextInput
-              value={code}
-              onChangeText={setCode}
-              placeholder="e.g. AB1234"
-              placeholderTextColor={COLORS.textMuted}
-              autoCapitalize="characters"
-              autoCorrect={false}
-              style={styles.input}
-            />
-
-            <Pressable
-              style={[styles.joinButton, (!code.trim() || loading) && styles.disabledButton]}
-              onPress={handleJoin}
-              disabled={!code.trim() || loading}
-            >
-              {loading ? <ActivityIndicator color={COLORS.textInverse} /> : <Text style={styles.joinButtonText}>Join Group</Text>}
-            </Pressable>
-          </View>
-        </Pressable>
-      </Pressable>
+        </TouchableWithoutFeedback>
+      </KeyboardAvoidingView>
     </Modal>
   );
 }
@@ -128,6 +142,9 @@ const styles = StyleSheet.create({
   overlay: {
     flex: 1,
     backgroundColor: 'rgba(0,0,0,0.6)',
+  },
+  overlayBackground: {
+    flex: 1,
     justifyContent: 'flex-end',
   },
   content: {

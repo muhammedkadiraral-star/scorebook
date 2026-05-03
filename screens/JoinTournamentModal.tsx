@@ -8,10 +8,15 @@ import {
   Text,
   TextInput,
   View,
+  KeyboardAvoidingView,
+  Platform,
+  TouchableWithoutFeedback,
+  Keyboard,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { supabase } from '../lib/supabase';
 import { COLORS, RADIUS, SIZES, SPACING } from '../constants/theme';
+import { FeedbackModal, FeedbackType } from '../components/FeedbackModal';
 
 type JoinTournamentModalProps = {
   visible: boolean;
@@ -23,6 +28,7 @@ type JoinTournamentModalProps = {
 export function JoinTournamentModal({ visible, userId, onClose, onJoined }: JoinTournamentModalProps) {
   const [code, setCode] = useState('');
   const [loading, setLoading] = useState(false);
+  const [feedback, setFeedback] = useState<{ visible: boolean; type: FeedbackType; title: string; message: string; onPrimaryPress?: () => void } | null>(null);
 
   const handleJoin = async () => {
     const trimmed = code.trim().toUpperCase();
@@ -30,49 +36,62 @@ export function JoinTournamentModal({ visible, userId, onClose, onJoined }: Join
     setLoading(true);
 
     try {
-      const { data: tournament, error: tError } = await supabase
-        .from('tournaments')
-        .select('id, name')
-        .eq('invite_code', trimmed)
-        .single();
-
-      if (tError || !tournament) {
-        Alert.alert('Tournament not found', 'Check the invite code and try again.');
-        setLoading(false);
-        return;
-      }
-
-      const { data: { user } } = await supabase.auth.getUser();
-      const currentUserId = user?.id;
-
-      if (!currentUserId) {
-        Alert.alert('Error', 'User not authenticated.');
-        setLoading(false);
-        return;
-      }
-
-      const { error: joinError } = await supabase.from('tournament_participants').insert({
-        tournament_id: tournament.id,
-        user_id: currentUserId,
-        status: 'registered'
+      const { data, error: rpcError } = await supabase.rpc('join_tournament_by_invite_code', {
+        p_invite_code: trimmed
       });
 
-      if (joinError) {
-        if (joinError.code === '23505') {
-          Alert.alert('Already Joined', 'You are already in this tournament.');
-          onJoined(tournament.id, tournament.name);
-          onClose();
+      if (rpcError || (data && data.success === false)) {
+        if (rpcError) console.error('Join tournament RPC error:', rpcError);
+        
+        if (data?.error === 'already_started') {
+          setFeedback({ visible: true, type: 'warning', title: "Tournament already started", message: data?.message || "You can no longer join this tournament because it has already started." });
+        } else if (data?.error === 'completed') {
+          setFeedback({ visible: true, type: 'warning', title: "Tournament completed", message: data?.message || "You can no longer join this tournament because it has already ended." });
+        } else if (data?.error === 'not_found') {
+          setFeedback({ visible: true, type: 'error', title: "Invalid code", message: data?.message || "Check the invite code and try again." });
+        } else if (data?.error === 'full') {
+          setFeedback({ visible: true, type: 'warning', title: "Tournament full", message: data?.message || "This tournament has reached its maximum capacity." });
         } else {
-          Alert.alert('Error', joinError.message);
+          setFeedback({ visible: true, type: 'error', title: "Could not join tournament", message: data?.message || rpcError?.message || "Please try again." });
         }
-      } else {
-        Alert.alert('Success', `You have joined "${tournament.name}"!`);
-        setCode('');
-        onJoined(tournament.id, tournament.name);
-        onClose();
+        setLoading(false);
+        return;
+      }
+
+      if (data?.success === true) {
+        if (data.already_joined) {
+          setFeedback({
+            visible: true,
+            type: 'info',
+            title: 'Already Joined',
+            message: 'You are already in this tournament.',
+            onPrimaryPress: () => {
+              setFeedback(null);
+              if (data.tournament_id && data.tournament_name) {
+                onJoined(data.tournament_id, data.tournament_name);
+              }
+              onClose();
+            }
+          });
+        } else {
+          setFeedback({
+            visible: true,
+            type: 'success',
+            title: 'Success',
+            message: `You have joined "${data.tournament_name}"!`,
+            onPrimaryPress: () => {
+              setFeedback(null);
+              setCode('');
+              if (data.tournament_id && data.tournament_name) {
+                onJoined(data.tournament_id, data.tournament_name);
+              }
+              onClose();
+            }
+          });
+        }
       }
     } catch (error) {
-      Alert.alert('Error', 'An unexpected error occurred.');
+      setFeedback({ visible: true, type: 'error', title: 'Error', message: 'An unexpected error occurred.' });
     } finally {
       setLoading(false);
     }
@@ -80,37 +99,56 @@ export function JoinTournamentModal({ visible, userId, onClose, onJoined }: Join
 
   return (
     <Modal visible={visible} transparent animationType="slide" onRequestClose={onClose}>
-      <Pressable style={styles.overlay} onPress={onClose}>
-        <Pressable style={styles.content} onPress={(e) => e.stopPropagation()}>
-          <View style={styles.header}>
-            <Text style={styles.title}>Join Tournament</Text>
-            <Pressable onPress={onClose}>
-              <Ionicons name="close" size={24} color={COLORS.textSecondary} />
+      <KeyboardAvoidingView
+        style={styles.overlay}
+        behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+      >
+        <TouchableWithoutFeedback onPress={Keyboard.dismiss}>
+          <View style={styles.overlayBackground}>
+            <Pressable style={StyleSheet.absoluteFill} onPress={onClose} />
+            <Pressable style={styles.content} onPress={(e) => e.stopPropagation()}>
+              <View style={styles.header}>
+                <Text style={styles.title}>Join Tournament</Text>
+                <Pressable onPress={onClose}>
+                  <Ionicons name="close" size={24} color={COLORS.textSecondary} />
+                </Pressable>
+              </View>
+
+              <View style={styles.form}>
+                <Text style={styles.label}>Invite Code</Text>
+                <TextInput
+                  value={code}
+                  onChangeText={setCode}
+                  placeholder="Enter invite code"
+                  placeholderTextColor={COLORS.textMuted}
+                  autoCapitalize="characters"
+                  autoCorrect={false}
+                  returnKeyType="done"
+                  onSubmitEditing={Keyboard.dismiss}
+                  style={styles.input}
+                />
+
+                <Pressable
+                  style={[styles.joinButton, (!code.trim() || loading) && styles.disabledButton]}
+                  onPress={handleJoin}
+                  disabled={!code.trim() || loading}
+                >
+                  {loading ? <ActivityIndicator color={COLORS.textInverse} /> : <Text style={styles.joinButtonText}>Join Tournament</Text>}
+                </Pressable>
+              </View>
             </Pressable>
           </View>
+        </TouchableWithoutFeedback>
+      </KeyboardAvoidingView>
 
-          <View style={styles.form}>
-            <Text style={styles.label}>Invite Code</Text>
-            <TextInput
-              value={code}
-              onChangeText={setCode}
-              placeholder="Enter invite code"
-              placeholderTextColor={COLORS.textMuted}
-              autoCapitalize="characters"
-              autoCorrect={false}
-              style={styles.input}
-            />
-
-            <Pressable
-              style={[styles.joinButton, (!code.trim() || loading) && styles.disabledButton]}
-              onPress={handleJoin}
-              disabled={!code.trim() || loading}
-            >
-              {loading ? <ActivityIndicator color={COLORS.textInverse} /> : <Text style={styles.joinButtonText}>Join Tournament</Text>}
-            </Pressable>
-          </View>
-        </Pressable>
-      </Pressable>
+      <FeedbackModal
+        visible={feedback?.visible || false}
+        type={feedback?.type || 'info'}
+        title={feedback?.title || ''}
+        message={feedback?.message || ''}
+        onPrimaryPress={feedback?.onPrimaryPress || (() => setFeedback(null))}
+        onClose={() => setFeedback(null)}
+      />
     </Modal>
   );
 }
@@ -119,6 +157,9 @@ const styles = StyleSheet.create({
   overlay: {
     flex: 1,
     backgroundColor: 'rgba(0,0,0,0.6)',
+  },
+  overlayBackground: {
+    flex: 1,
     justifyContent: 'flex-end',
   },
   content: {
