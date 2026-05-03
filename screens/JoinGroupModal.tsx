@@ -24,55 +24,63 @@ export function JoinGroupModal({ visible, userId, onClose, onJoined }: JoinGroup
   const [code, setCode] = useState('');
   const [loading, setLoading] = useState(false);
 
+type JoinGroupRpcResponse = {
+  success: boolean;
+  already_member?: boolean;
+  group_id?: string;
+  group_name?: string;
+  message?: string;
+  error?: string;
+};
+
   const handleJoin = async () => {
-    const trimmed = code.trim().toUpperCase();
-    if (!trimmed) return;
+    const normalizedCode = code.trim().toUpperCase();
+
+    if (!normalizedCode) {
+      Alert.alert('Missing code', 'Please enter an invite code.');
+      return;
+    }
     setLoading(true);
 
     try {
-      const { data: group, error: groupError } = await supabase
-        .from('groups')
-        .select('id, name')
-        .eq('invite_code', trimmed)
-        .maybeSingle();
+      const { data, error } = await supabase.rpc('join_group_by_invite_code', {
+        p_invite_code: normalizedCode,
+      });
 
-      if (groupError) throw groupError;
-      if (!group) {
-        Alert.alert('Invalid code', 'No group found with this invite code.');
+      console.log('join_group_by_invite_code response:', { data, error });
+
+      if (error) {
+        console.error('Join group RPC error:', error);
+        Alert.alert('Join failed', error.message || 'Could not join group.');
         return;
       }
 
-      const { data: existing, error: existingError } = await supabase
-        .from('group_members')
-        .select('id')
-        .eq('group_id', group.id)
-        .eq('user_id', userId)
-        .maybeSingle();
-
-      if (existingError) throw existingError;
-      if (existing) {
-        Alert.alert('Already a member', `You are already in the group "${group.name}".`);
-        onJoined();
-        onClose();
+      if (!data || data.success === false) {
+        Alert.alert(
+          'Join failed',
+          data?.message || 'No group found with this invite code.'
+        );
         return;
       }
 
-      const { error: memberError } = await supabase
-        .from('group_members')
-        .insert({
-          group_id: group.id,
-          user_id: userId,
-          role: 'member',
-        });
+      if (data.already_member) {
+        Alert.alert(
+          'Already joined',
+          data.message || 'You are already a member of this group.'
+        );
+      } else {
+        Alert.alert(
+          'Joined group',
+          data.group_name ? `You joined ${data.group_name}.` : 'You joined the group.'
+        );
+      }
 
-      if (memberError) throw memberError;
-
-      Alert.alert('Joined', `Successfully joined "${group.name}".`);
       setCode('');
       onJoined();
       onClose();
-    } catch (error) {
-      const message = error instanceof Error ? error.message : 'Something went wrong.';
+    } catch (error: any) {
+      console.error('Join group catch block error:', error);
+      const message = error?.message || 'Something went wrong.';
       Alert.alert('Error', message);
     } finally {
       setLoading(false);

@@ -28,6 +28,12 @@ export function CreateGroupScreen({ userId, gameType, onBack, onCreated }: Creat
 
   const handleCreate = async () => {
     if (!name.trim()) return;
+
+    if (!userId) {
+      Alert.alert('Error', 'User session not found.');
+      return;
+    }
+
     setLoading(true);
 
     try {
@@ -44,21 +50,28 @@ export function CreateGroupScreen({ userId, gameType, onBack, onCreated }: Creat
         .select()
         .single();
 
-      if (error) throw error;
+      if (error) {
+        console.error('Create group insert error:', error);
+        throw error;
+      }
 
       const { error: memberError } = await supabase
         .from('group_members')
         .insert({
           group_id: data.id,
           user_id: userId,
-          role: 'admin',
+          joined_at: new Date().toISOString(),
         });
 
-      if (memberError) throw memberError;
+      if (memberError) {
+        console.error('Group member insert error:', memberError);
+        throw memberError;
+      }
 
       setInviteCode(code);
-    } catch (error) {
-      const message = error instanceof Error ? error.message : 'Could not create group.';
+    } catch (error: any) {
+      console.error('Create group catch error:', error);
+      const message = error instanceof Error ? error.message : (error?.message || 'Could not create group.');
       Alert.alert('Error', message);
     } finally {
       setLoading(false);

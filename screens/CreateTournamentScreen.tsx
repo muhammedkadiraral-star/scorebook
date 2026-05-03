@@ -31,6 +31,31 @@ export function CreateTournamentScreen({ userId, gameType, onBack, onCreated }: 
   const [isPublic, setIsPublic] = useState(true);
   const [loading, setLoading] = useState(false);
   const [inviteCode, setInviteCode] = useState<string | null>(null);
+  const [tempo, setTempo] = useState<'fast' | 'normal' | 'flexible'>('normal');
+
+  const tempoOptions = [
+    {
+      value: 'fast',
+      round_deadline_hours: 8,
+      label: 'Fast',
+      description: '6–8 hours per round',
+      estimated_completion: 'Usually finishes within 1 day'
+    },
+    {
+      value: 'normal',
+      round_deadline_hours: 24,
+      label: 'Normal',
+      description: '24 hours per round',
+      estimated_completion: 'Usually finishes in 2–3 days'
+    },
+    {
+      value: 'flexible',
+      round_deadline_hours: 72,
+      label: 'Flexible',
+      description: '72 hours per round',
+      estimated_completion: 'Best for casual groups'
+    }
+  ] as const;
 
   const knockoutOptions = [4, 8, 16];
   const leagueOptions = [3, 4, 5, 6, 8, 10];
@@ -57,6 +82,9 @@ export function CreateTournamentScreen({ userId, gameType, onBack, onCreated }: 
           invite_code: code,
           created_by: userId,
           start_date: new Date().toISOString(),
+          tempo: tempoOptions.find(t => t.value === tempo)?.value,
+          round_deadline_hours: tempoOptions.find(t => t.value === tempo)?.round_deadline_hours,
+          estimated_completion: tempoOptions.find(t => t.value === tempo)?.estimated_completion,
         })
         .select()
         .single();
@@ -197,6 +225,22 @@ export function CreateTournamentScreen({ userId, gameType, onBack, onCreated }: 
           ))}
         </ScrollView>
 
+        {/* Tempo Selection */}
+        <Text style={styles.inputLabel}>Tournament Pace</Text>
+        <View style={styles.tempoContainer}>
+          {tempoOptions.map((option) => (
+            <Pressable
+              key={option.value}
+              style={[styles.tempoCard, tempo === option.value && styles.tempoCardActive]}
+              onPress={() => setTempo(option.value as any)}
+            >
+              <Text style={[styles.tempoLabel, tempo === option.value && styles.tempoLabelActive]}>{option.label}</Text>
+              <Text style={[styles.tempoDesc, tempo === option.value && styles.tempoDescActive]}>{option.description}</Text>
+              <Text style={styles.tempoEst}>{option.estimated_completion}</Text>
+            </Pressable>
+          ))}
+        </View>
+
         {/* Visibility */}
         <Text style={styles.inputLabel}>Visibility</Text>
         <View style={styles.segmentedControl}>
@@ -279,6 +323,14 @@ const styles = StyleSheet.create({
   segmentText: { fontSize: 14, fontWeight: '600', color: COLORS.textSecondary },
   segmentTextActive: { color: COLORS.primary },
   hintText: { fontSize: 12, color: COLORS.textSecondary, marginTop: 8 },
+  tempoContainer: { gap: 8, marginTop: 4 },
+  tempoCard: { padding: 16, borderRadius: 12, borderWidth: 1, borderColor: COLORS.border, backgroundColor: COLORS.card },
+  tempoCardActive: { borderColor: COLORS.primary, backgroundColor: COLORS.primaryMuted },
+  tempoLabel: { fontSize: 16, fontWeight: '700', color: COLORS.textPrimary, marginBottom: 4 },
+  tempoLabelActive: { color: COLORS.primary },
+  tempoDesc: { fontSize: 13, color: COLORS.textSecondary, marginBottom: 8 },
+  tempoDescActive: { color: COLORS.textPrimary },
+  tempoEst: { fontSize: 12, color: COLORS.textMuted, fontStyle: 'italic' },
   spacer: { height: 60 },
   createButton: { height: 56, backgroundColor: COLORS.primary, borderRadius: RADIUS.button, justifyContent: 'center', alignItems: 'center', marginBottom: 40 },
   disabledButton: { backgroundColor: COLORS.textMuted },

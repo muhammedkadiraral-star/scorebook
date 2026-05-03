@@ -59,6 +59,14 @@ type LeaderboardRow = {
   avatarUrl: string | null;
 };
 
+type DeleteGroupRpcResponse = {
+  success: boolean;
+  group_id?: string;
+  group_name?: string;
+  message?: string;
+  error?: string;
+};
+
 export function GroupDetailScreen({ groupId, groupName, userId, onBack, onAddMatch }: GroupDetailScreenProps) {
   const [loading, setLoading] = useState(true);
   const [activeTab, setActiveTab] = useState<TabKey>('matches');
@@ -70,6 +78,7 @@ export function GroupDetailScreen({ groupId, groupName, userId, onBack, onAddMat
   const [playerBId, setPlayerBId] = useState<string | null>(null);
   const [createdBy, setCreatedBy] = useState<string | null>(null);
   const [showSettings, setShowSettings] = useState(false);
+  const [deleting, setDeleting] = useState(false);
 
   const loadGroupDetail = useCallback(async () => {
     setLoading(true);
@@ -120,6 +129,8 @@ export function GroupDetailScreen({ groupId, groupName, userId, onBack, onAddMat
   useEffect(() => {
     void loadGroupDetail();
   }, [loadGroupDetail]);
+
+  const isCreator = !!createdBy && !!userId && createdBy === userId;
 
   const memberNameMap = useMemo(() => {
     return members.reduce<Record<string, string>>((acc, member) => {
@@ -248,6 +259,53 @@ export function GroupDetailScreen({ groupId, groupName, userId, onBack, onAddMat
         },
       ]
     );
+  };
+
+  const handleDelete = () => {
+    setShowSettings(false);
+    
+    setTimeout(() => {
+      Alert.alert(
+        'Delete Group?',
+        'This will permanently delete the group, its members, matches, and notifications. This action cannot be undone.',
+        [
+          { text: 'Cancel', style: 'cancel' },
+          {
+            text: 'Delete',
+            style: 'destructive',
+            onPress: async () => {
+              try {
+                setDeleting(true);
+                const { data, error } = await supabase.rpc('delete_group_as_creator', {
+                  p_group_id: groupId,
+                });
+
+                if (error) {
+                  console.error('Delete group RPC error:', error);
+                  Alert.alert('Delete failed', error.message || 'Could not delete group.');
+                  return;
+                }
+
+                const response = data as DeleteGroupRpcResponse;
+
+                if (response && response.success === false) {
+                  Alert.alert('Delete failed', response.message || 'Could not delete group.');
+                  return;
+                }
+
+                Alert.alert('Group deleted', response?.message || 'Group deleted successfully.');
+                onBack();
+              } catch (error: any) {
+                console.error('Delete group catch error:', error);
+                Alert.alert('Delete failed', error?.message || 'Could not delete group.');
+              } finally {
+                setDeleting(false);
+              }
+            },
+          },
+        ]
+      );
+    }, 400);
   };
 
   const renderAvatar = (avatarUrl: string | null, name: string, size = 32) => {
@@ -407,6 +465,25 @@ export function GroupDetailScreen({ groupId, groupName, userId, onBack, onAddMat
               </View>
               <Ionicons name="chevron-forward" size={20} color={COLORS.textMuted} />
             </Pressable>
+
+            {isCreator && (
+              <>
+                <View style={styles.actionDivider} />
+                <Pressable style={styles.actionItem} onPress={handleDelete} disabled={deleting}>
+                  <View style={{ flexDirection: 'row', alignItems: 'center', gap: 12 }}>
+                    {deleting ? (
+                      <ActivityIndicator color={COLORS.error} size={24} />
+                    ) : (
+                      <Ionicons name="trash-outline" size={24} color={COLORS.error} />
+                    )}
+                    <Text style={[styles.actionItemText, { color: COLORS.error }]}>
+                      {deleting ? 'Deleting...' : 'Delete Group'}
+                    </Text>
+                  </View>
+                  {!deleting && <Ionicons name="chevron-forward" size={20} color={COLORS.textMuted} />}
+                </Pressable>
+              </>
+            )}
 
             <Pressable style={styles.actionCancel} onPress={() => setShowSettings(false)}>
               <Text style={styles.actionCancelText}>Cancel</Text>

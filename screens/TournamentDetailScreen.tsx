@@ -3,7 +3,10 @@ import {
   ActivityIndicator,
   Alert,
   FlatList,
+  Keyboard,
+  KeyboardAvoidingView,
   Modal,
+  Platform,
   Pressable,
   SafeAreaView,
   ScrollView,
@@ -11,6 +14,7 @@ import {
   StyleSheet,
   Text,
   TextInput,
+  TouchableWithoutFeedback,
   View,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
@@ -37,6 +41,10 @@ type Tournament = {
   invite_code: string;
   is_public: boolean;
   created_by: string;
+  tempo?: string;
+  round_deadline_hours?: number;
+  estimated_completion?: string | null;
+  started_at?: string | null;
 };
 
 type Participant = {
@@ -51,11 +59,11 @@ type TournamentMatch = {
   id: string;
   round: number;
   match_order: number;
-  player1_id: string | null;
-  player2_id: string | null;
-  score1: number | null;
-  score2: number | null;
-  winner_id: string | null;
+  player_home: string | null;
+  player_away: string | null;
+  score_home: number | null;
+  score_away: number | null;
+  winner: string | null;
   status: 'pending' | 'completed';
 };
 
@@ -72,6 +80,14 @@ type LeagueStanding = {
   pts: number;
 };
 
+type DeleteTournamentRpcResponse = {
+  success: boolean;
+  tournament_id?: string;
+  tournament_name?: string;
+  message?: string;
+  error?: string;
+};
+
 export function TournamentDetailScreen({ userId, tournamentId, onBack }: TournamentDetailScreenProps) {
   const [loading, setLoading] = useState(true);
   const [tournament, setTournament] = useState<Tournament | null>(null);
@@ -83,9 +99,11 @@ export function TournamentDetailScreen({ userId, tournamentId, onBack }: Tournam
 
   // Score modal state
   const [scoreModalMatch, setScoreModalMatch] = useState<TournamentMatch | null>(null);
-  const [score1, setScore1] = useState('');
-  const [score2, setScore2] = useState('');
+  const [scoreHome, setScoreHome] = useState('');
+  const [scoreAway, setScoreAway] = useState('');
   const [savingScore, setSavingScore] = useState(false);
+  const [starting, setStarting] = useState(false);
+  const [deleting, setDeleting] = useState(false);
 
   const loadData = useCallback(async () => {
     setLoading(true);
@@ -110,10 +128,6 @@ export function TournamentDetailScreen({ userId, tournamentId, onBack }: Tournam
         seed: p.seed,
       })));
       setMatches(mData ?? []);
-      
-      if (tData.format === 'league') {
-        setActiveTab('table');
-      }
     } catch (error) {
       console.error('Error loading tournament data:', error);
     } finally {
@@ -148,12 +162,12 @@ export function TournamentDetailScreen({ userId, tournamentId, onBack }: Tournam
     });
 
     matches.filter(m => m.status === 'completed').forEach(m => {
-      if (!m.player1_id || !m.player2_id) return;
-      const s1 = m.score1 ?? 0;
-      const s2 = m.score2 ?? 0;
+      if (!m.player_home || !m.player_away) return;
+      const s1 = m.score_home ?? 0;
+      const s2 = m.score_away ?? 0;
 
-      const p1 = stats[m.player1_id];
-      const p2 = stats[m.player2_id];
+      const p1 = stats[m.player_home];
+      const p2 = stats[m.player_away];
       if (!p1 || !p2) return;
 
       p1.played += 1; p2.played += 1;
@@ -178,73 +192,128 @@ export function TournamentDetailScreen({ userId, tournamentId, onBack }: Tournam
   }, [participants, matches, tournament]);
 
   const startTournament = async () => {
-    if (!tournament || participants.length < (tournament.format === 'league' ? 3 : 4)) {
-      Alert.alert('Cannot start', `Minimum ${tournament?.format === 'league' ? 3 : 4} participants required.`);
+    if (!tournament) return;
+
+    if (tournament.format === 'league' && participants.length < 2) {
+      Alert.alert('Not enough players', 'League requires at least 2 players.');
+      return;
+    }
+    if (tournament.format === 'knockout' && participants.length < 4) {
+      Alert.alert('Cannot start', 'Minimum 4 participants required for knockout.');
       return;
     }
 
-    try {
-      setLoading(true);
-      const { error: tError } = await supabase.from('tournaments').update({ status: 'in_progress' }).eq('id', tournamentId);
-      if (tError) throw tError;
+    Alert.alert(
+      'Start Tournament?',
+      'Players will no longer be able to join after the tournament starts.',
+      [
+        { text: 'Cancel', style: 'cancel' },
+        {
+          text: 'Start',
+          onPress: async () => {
+            try {
+              setStarting(true);
 
-      const shuffled = [...participants].sort(() => Math.random() - 0.5);
-      const newMatches = [];
+              if (tournament.format === 'league') {
+                const { data: existingMatches, error: checkError } = await supabase
+                  .from('tournament_matches')
+                  .select('id')
+                  .eq('tournament_id', tournamentId)
+                  .limit(1);
 
-      if (tournament.format === 'knockout') {
-        const round1Count = participants.length === 16 ? 8 : participants.length >= 8 ? 4 : 2;
-        for (let i = 0; i < round1Count; i++) {
-          newMatches.push({
-            tournament_id: tournamentId,
-            round: 1,
-            match_order: i + 1,
-            player1_id: shuffled[i * 2]?.user_id ?? null,
-            player2_id: shuffled[i * 2 + 1]?.user_id ?? null,
-            status: 'pending',
-          });
-        }
-      } else {
-        // Round-robin for League
-        for (let i = 0; i < shuffled.length; i++) {
-          for (let j = i + 1; j < shuffled.length; j++) {
-            newMatches.push({
-              tournament_id: tournamentId,
-              round: 1,
-              match_order: newMatches.length + 1,
-              player1_id: shuffled[i].user_id,
-              player2_id: shuffled[j].user_id,
-              status: 'pending',
-            });
+                if (checkError) {
+                  console.error('Check match error', checkError);
+                  Alert.alert('Error', 'Could not check existing matches.');
+                  return;
+                }
+
+                if (!existingMatches || existingMatches.length === 0) {
+                  const deadlineDate = new Date(Date.now() + (tournament.round_deadline_hours || 24) * 60 * 60 * 1000).toISOString();
+                  const newMatches = [];
+                  let matchOrder = 1;
+                  for (let i = 0; i < participants.length - 1; i++) {
+                    for (let j = i + 1; j < participants.length; j++) {
+                      newMatches.push({
+                        tournament_id: tournamentId,
+                        round: 1,
+                        match_order: matchOrder++,
+                        player_home: participants[i].user_id,
+                        player_away: participants[j].user_id,
+                        score_home: null,
+                        score_away: null,
+                        winner: null,
+                        status: 'pending',
+                        deadline: deadlineDate
+                      });
+                    }
+                  }
+
+                  const { error: insertError } = await supabase
+                    .from('tournament_matches')
+                    .insert(newMatches);
+
+                  if (insertError) {
+                    console.error('Insert match error', insertError);
+                    Alert.alert('Error', 'Could not generate fixtures.');
+                    return;
+                  }
+                }
+              }
+
+              const { error: tError } = await supabase
+                .from('tournaments')
+                .update({ 
+                  status: 'in_progress',
+                  started_at: new Date().toISOString()
+                })
+                .eq('id', tournamentId);
+                
+              if (tError) {
+                console.error('Update tournament error', tError);
+                Alert.alert('Error', 'Could not start tournament.');
+                return;
+              }
+              
+              loadData();
+            } catch (error) {
+              console.error('Start tournament catch error', error);
+              Alert.alert('Error', 'Could not start tournament.');
+            } finally {
+              setStarting(false);
+            }
           }
         }
-      }
-
-      const { error: mError } = await supabase.from('tournament_matches').insert(newMatches);
-      if (mError) throw mError;
-
-      loadData();
-    } catch (error) {
-      Alert.alert('Error', 'Could not start tournament.');
-    } finally {
-      setLoading(false);
-    }
+      ]
+    );
   };
 
   const saveScore = async () => {
-    if (!scoreModalMatch || !score1 || !score2) return;
-    const s1 = parseInt(score1);
-    const s2 = parseInt(score2);
+    Keyboard.dismiss();
+
+    if (!userId) {
+      Alert.alert('Error', 'User session not found.');
+      return;
+    }
+
+    if (!scoreModalMatch || !scoreHome || !scoreAway) return;
+    const s1 = parseInt(scoreHome);
+    const s2 = parseInt(scoreAway);
     if (isNaN(s1) || isNaN(s2)) return;
 
     setSavingScore(true);
     try {
-      const winnerId = s1 > s2 ? scoreModalMatch.player1_id : scoreModalMatch.player2_id;
+      const winnerId = s1 > s2 ? scoreModalMatch.player_home : scoreModalMatch.player_away;
       
+      const now = new Date().toISOString();
       const { error: matchError } = await supabase.from('tournament_matches').update({
-        score1: s1,
-        score2: s2,
-        winner_id: s1 === s2 ? null : winnerId,
+        score_home: s1,
+        score_away: s2,
+        winner: s1 === s2 ? null : winnerId,
         status: 'completed',
+        played_at: now,
+        score_submitted_by: userId,
+        score_submitted_at: now,
+        score_confirmed: true,
       }).eq('id', scoreModalMatch.id);
 
       if (matchError) throw matchError;
@@ -261,7 +330,7 @@ export function TournamentDetailScreen({ userId, tournamentId, onBack }: Tournam
         const allCompleted = (roundMatches ?? []).every(m => m.status === 'completed' || m.id === scoreModalMatch.id);
         
         if (allCompleted) {
-          const winners = (roundMatches ?? []).map(m => m.id === scoreModalMatch.id ? winnerId : m.winner_id);
+          const winners = (roundMatches ?? []).map(m => m.id === scoreModalMatch.id ? winnerId : m.winner);
           if (winners.length > 1) {
             const nextMatches = [];
             for (let i = 0; i < winners.length / 2; i++) {
@@ -269,8 +338,8 @@ export function TournamentDetailScreen({ userId, tournamentId, onBack }: Tournam
                 tournament_id: tournamentId,
                 round: currentRound + 1,
                 match_order: i + 1,
-                player1_id: winners[i * 2],
-                player2_id: winners[i * 2 + 1],
+                player_home: winners[i * 2],
+                player_away: winners[i * 2 + 1],
                 status: 'pending',
               });
             }
@@ -336,26 +405,74 @@ export function TournamentDetailScreen({ userId, tournamentId, onBack }: Tournam
     );
   };
 
+  const handleDelete = () => {
+    setShowSettings(false);
+    if (!tournament) return;
+    
+    setTimeout(() => {
+      Alert.alert(
+        'Delete Tournament?',
+        'This will permanently delete the tournament, its players, fixtures, and results. This action cannot be undone.',
+        [
+          { text: 'Cancel', style: 'cancel' },
+          {
+            text: 'Delete',
+            style: 'destructive',
+            onPress: async () => {
+              try {
+                setDeleting(true);
+                const { data, error } = await supabase.rpc('delete_tournament_as_creator', {
+                  p_tournament_id: tournament.id,
+                });
+
+                if (error) {
+                  console.error('Delete tournament RPC error:', error);
+                  Alert.alert('Delete failed', error.message || 'Could not delete tournament.');
+                  return;
+                }
+
+                const response = data as DeleteTournamentRpcResponse;
+
+                if (response && response.success === false) {
+                  Alert.alert('Delete failed', response.message || 'Could not delete tournament.');
+                  return;
+                }
+
+                Alert.alert('Tournament deleted', response?.message || 'Tournament deleted successfully.');
+                onBack();
+              } catch (error: any) {
+                console.error('Delete tournament catch error:', error);
+                Alert.alert('Delete failed', error?.message || 'Could not delete tournament.');
+              } finally {
+                setDeleting(false);
+              }
+            },
+          },
+        ]
+      );
+    }, 400);
+  };
+
   const renderMatchCard = (item: TournamentMatch) => {
-    const p1 = participants.find(p => p.user_id === item.player1_id);
-    const p2 = participants.find(p => p.user_id === item.player2_id);
-    const isMyMatch = (item.player1_id === userId || item.player2_id === userId) && item.status === 'pending';
-    const isWinner1 = item.winner_id === item.player1_id;
-    const isWinner2 = item.winner_id === item.player2_id;
+    const p1 = participants.find(p => p.user_id === item.player_home);
+    const p2 = participants.find(p => p.user_id === item.player_away);
+    const isMyMatch = (item.player_home === userId || item.player_away === userId) && item.status === 'pending';
+    const isWinner1 = item.winner === item.player_home;
+    const isWinner2 = item.winner === item.player_away;
 
     return (
       <View key={item.id} style={styles.matchCard}>
         <View style={styles.matchRow}>
           <Text style={[styles.matchPlayer, isWinner1 && styles.matchWinner]}>{p1?.display_name ?? 'TBD'}</Text>
-          <Text style={styles.matchScore}>{item.status === 'completed' ? item.score1 : '-'}</Text>
+          <Text style={styles.matchScore}>{item.status === 'completed' ? item.score_home : '-'}</Text>
         </View>
         <View style={styles.matchDivider} />
         <View style={styles.matchRow}>
           <Text style={[styles.matchPlayer, isWinner2 && styles.matchWinner]}>{p2?.display_name ?? 'TBD'}</Text>
-          <Text style={styles.matchScore}>{item.status === 'completed' ? item.score2 : '-'}</Text>
+          <Text style={styles.matchScore}>{item.status === 'completed' ? item.score_away : '-'}</Text>
         </View>
         {isMyMatch && (
-          <Pressable style={styles.scoreAction} onPress={() => { setScoreModalMatch(item); setScore1(''); setScore2(''); }}>
+          <Pressable style={styles.scoreAction} onPress={() => { setScoreModalMatch(item); setScoreHome(''); setScoreAway(''); }}>
             <Text style={styles.scoreActionText}>Enter Score</Text>
           </Pressable>
         )}
@@ -398,8 +515,21 @@ export function TournamentDetailScreen({ userId, tournamentId, onBack }: Tournam
               <Text style={styles.infoValue}>{participants.length}/{tournament?.max_participants}</Text>
             </View>
             <View style={styles.infoCol}>
+              <Text style={styles.infoLabel}>PACE</Text>
+              <Text style={styles.infoValue}>{(tournament?.tempo || 'normal').toUpperCase()}</Text>
+            </View>
+          </View>
+
+          <View style={styles.infoTop}>
+            <View style={styles.infoCol}>
+              <Text style={styles.infoLabel}>EST. COMPLETION</Text>
+              <Text style={[styles.infoValue, { fontSize: 13, color: COLORS.textSecondary }]}>
+                {tournament?.estimated_completion || `${tournament?.round_deadline_hours || 24}h per round`}
+              </Text>
+            </View>
+            <View style={styles.infoCol}>
               <Text style={styles.infoLabel}>VISIBILITY</Text>
-              <Text style={styles.infoValue}>{tournament?.is_public ? 'PUBLIC' : 'PRIVATE'}</Text>
+              <Text style={[styles.infoValue, { fontSize: 13, color: COLORS.textSecondary }]}>{tournament?.is_public ? 'PUBLIC' : 'PRIVATE'}</Text>
             </View>
           </View>
 
@@ -421,10 +551,27 @@ export function TournamentDetailScreen({ userId, tournamentId, onBack }: Tournam
           </View>
         </View>
 
+        {/* Start Button (Admin) */}
+        {isCreator && tournament?.status === 'open' && (
+          <Pressable 
+            style={[styles.mainBtn, { marginBottom: 20 }]} 
+            onPress={startTournament}
+            disabled={starting}
+          >
+            {starting ? (
+              <ActivityIndicator color={COLORS.textInverse} />
+            ) : (
+              <Text style={styles.mainBtnText}>Start Tournament</Text>
+            )}
+          </Pressable>
+        )}
+
         {/* Tabs */}
         <View style={styles.tabs}>
           <Pressable style={[styles.tab, activeTab === 'bracket' && styles.tabActive]} onPress={() => setActiveTab('bracket')}>
-            <Text style={[styles.tabText, activeTab === 'bracket' && styles.tabTextActive]}>Bracket</Text>
+            <Text style={[styles.tabText, activeTab === 'bracket' && styles.tabTextActive]}>
+              {tournament?.format === 'league' ? 'Matches' : 'Bracket'}
+            </Text>
           </Pressable>
           {tournament?.format === 'league' && (
             <Pressable style={[styles.tab, activeTab === 'table' && styles.tabActive]} onPress={() => setActiveTab('table')}>
@@ -439,27 +586,23 @@ export function TournamentDetailScreen({ userId, tournamentId, onBack }: Tournam
         {/* Content */}
         {activeTab === 'participants' && (
           <View style={styles.tabContent}>
-            {participants.map(p => (
-              <View key={p.id} style={styles.participantItem}>
-                <View style={styles.avatar}><Text>{p.avatar_url ?? p.display_name.charAt(0)}</Text></View>
-                <Text style={styles.participantName}>{p.display_name}</Text>
-                {p.user_id === tournament?.created_by && <View style={styles.creatorBadge}><Text style={styles.creatorBadgeText}>Creator</Text></View>}
-              </View>
-            ))}
+            {participants.map((p, index) => {
+              const participantKey = p.id || p.user_id || `participant-${index}`;
+              return (
+                <View key={participantKey} style={styles.participantItem}>
+                  <View style={styles.avatar}><Text>{p.avatar_url ?? p.display_name.charAt(0)}</Text></View>
+                  <Text style={styles.participantName}>{p.display_name}</Text>
+                  {p.user_id === tournament?.created_by && <View style={styles.creatorBadge}><Text style={styles.creatorBadgeText}>Creator</Text></View>}
+                </View>
+              );
+            })}
             
-            {tournament?.status === 'open' && (
+            {tournament?.status === 'open' && !isParticipant && participants.length < (tournament?.max_participants ?? 0) && (
               <View style={styles.actions}>
-                {!isParticipant && participants.length < (tournament?.max_participants ?? 0) && (
-                  <Pressable style={styles.mainBtn} onPress={async () => {
-                    const { error } = await supabase.from('tournament_participants').insert({ tournament_id: tournamentId, user_id: userId, seed: participants.length + 1 });
-                    if (!error) loadData();
-                  }}><Text style={styles.mainBtnText}>Join Tournament</Text></Pressable>
-                )}
-                {isCreator && participants.length >= (tournament?.format === 'league' ? 3 : 4) && (
-                  <Pressable style={[styles.mainBtn, { backgroundColor: COLORS.success }]} onPress={startTournament}>
-                    <Text style={styles.mainBtnText}>Start Tournament</Text>
-                  </Pressable>
-                )}
+                <Pressable style={styles.mainBtn} onPress={async () => {
+                  const { error } = await supabase.from('tournament_participants').insert({ tournament_id: tournamentId, user_id: userId, seed: participants.length + 1 });
+                  if (!error) loadData();
+                }}><Text style={styles.mainBtnText}>Join Tournament</Text></Pressable>
               </View>
             )}
           </View>
@@ -485,16 +628,15 @@ export function TournamentDetailScreen({ userId, tournamentId, onBack }: Tournam
                 <Text style={[styles.tableCol, { fontWeight: '700', color: COLORS.primary }]}>{s.pts}</Text>
               </View>
             ))}
-            
-            <Text style={styles.matchesTitle}>Matches</Text>
-            {matches.map(m => <View key={m.id}>{renderMatchCard(m)}</View>)}
           </View>
         )}
 
         {activeTab === 'bracket' && (
           <View style={styles.tabContent}>
             {tournament?.status === 'open' ? (
-              <Text style={styles.emptyText}>Bracket will appear once tournament starts</Text>
+              <Text style={styles.emptyText}>
+                {tournament?.format === 'league' ? 'Matches will appear once tournament starts' : 'Bracket will appear once tournament starts'}
+              </Text>
             ) : (
               tournament?.format === 'knockout' ? (
                 <View style={styles.bracketContainer}>
@@ -521,28 +663,51 @@ export function TournamentDetailScreen({ userId, tournamentId, onBack }: Tournam
 
       {/* Score Modal */}
       <Modal visible={!!scoreModalMatch} transparent animationType="fade">
-        <View style={styles.modalOverlay}>
-          <View style={styles.modalContent}>
-            <Text style={styles.modalTitle}>Enter Score</Text>
-            <View style={styles.scoreRow}>
-              <View style={styles.scoreInputGroup}>
-                <Text style={styles.playerName}>{participants.find(p => p.user_id === scoreModalMatch?.player1_id)?.display_name}</Text>
-                <TextInput style={styles.scoreInput} value={score1} onChangeText={setScore1} keyboardType="number-pad" placeholder="0" />
+        <TouchableWithoutFeedback onPress={Keyboard.dismiss}>
+          <KeyboardAvoidingView 
+            style={styles.modalOverlay}
+            behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+          >
+            <View style={styles.modalContent}>
+              <Text style={styles.modalTitle}>Enter Score</Text>
+              <View style={styles.scoreRow}>
+                <View style={styles.scoreInputGroup}>
+                  <Text style={styles.playerName}>{participants.find(p => p.user_id === scoreModalMatch?.player_home)?.display_name}</Text>
+                  <TextInput 
+                    style={styles.scoreInput} 
+                    value={scoreHome} 
+                    onChangeText={setScoreHome} 
+                    keyboardType="number-pad" 
+                    placeholder="0"
+                    returnKeyType="done"
+                    blurOnSubmit={true}
+                    onSubmitEditing={Keyboard.dismiss}
+                  />
+                </View>
+                <Text style={styles.vsText}>VS</Text>
+                <View style={styles.scoreInputGroup}>
+                  <Text style={styles.playerName}>{participants.find(p => p.user_id === scoreModalMatch?.player_away)?.display_name}</Text>
+                  <TextInput 
+                    style={styles.scoreInput} 
+                    value={scoreAway} 
+                    onChangeText={setScoreAway} 
+                    keyboardType="number-pad" 
+                    placeholder="0"
+                    returnKeyType="done"
+                    blurOnSubmit={true}
+                    onSubmitEditing={Keyboard.dismiss}
+                  />
+                </View>
               </View>
-              <Text style={styles.vsText}>VS</Text>
-              <View style={styles.scoreInputGroup}>
-                <Text style={styles.playerName}>{participants.find(p => p.user_id === scoreModalMatch?.player2_id)?.display_name}</Text>
-                <TextInput style={styles.scoreInput} value={score2} onChangeText={setScore2} keyboardType="number-pad" placeholder="0" />
+              <View style={styles.modalActions}>
+                <Pressable style={styles.cancelBtn} onPress={() => { Keyboard.dismiss(); setScoreModalMatch(null); }}><Text style={styles.cancelBtnText}>Cancel</Text></Pressable>
+                <Pressable style={styles.saveBtn} onPress={saveScore} disabled={savingScore}>
+                  {savingScore ? <ActivityIndicator color={COLORS.textInverse} /> : <Text style={styles.saveBtnText}>Save Result</Text>}
+                </Pressable>
               </View>
             </View>
-            <View style={styles.modalActions}>
-              <Pressable style={styles.cancelBtn} onPress={() => setScoreModalMatch(null)}><Text style={styles.cancelBtnText}>Cancel</Text></Pressable>
-              <Pressable style={styles.saveBtn} onPress={saveScore} disabled={savingScore}>
-                {savingScore ? <ActivityIndicator color={COLORS.textInverse} /> : <Text style={styles.saveBtnText}>Save Result</Text>}
-              </Pressable>
-            </View>
-          </View>
-        </View>
+          </KeyboardAvoidingView>
+        </TouchableWithoutFeedback>
       </Modal>
 
       {/* Settings Action Modal */}
@@ -566,6 +731,25 @@ export function TournamentDetailScreen({ userId, tournamentId, onBack }: Tournam
               </View>
               <Ionicons name="chevron-forward" size={20} color={COLORS.textMuted} />
             </Pressable>
+
+            {isCreator && (
+              <>
+                <View style={styles.actionDivider} />
+                <Pressable style={styles.actionItem} onPress={handleDelete} disabled={deleting}>
+                  <View style={{ flexDirection: 'row', alignItems: 'center', gap: 12 }}>
+                    {deleting ? (
+                      <ActivityIndicator color={COLORS.error} size={24} />
+                    ) : (
+                      <Ionicons name="trash-outline" size={24} color={COLORS.error} />
+                    )}
+                    <Text style={[styles.actionItemText, { color: COLORS.error }]}>
+                      {deleting ? 'Deleting...' : 'Delete Tournament'}
+                    </Text>
+                  </View>
+                  {!deleting && <Ionicons name="chevron-forward" size={20} color={COLORS.textMuted} />}
+                </Pressable>
+              </>
+            )}
 
             <Pressable style={styles.actionCancel} onPress={() => setShowSettings(false)}>
               <Text style={styles.actionCancelText}>Cancel</Text>
