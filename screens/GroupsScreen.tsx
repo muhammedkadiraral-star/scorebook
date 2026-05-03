@@ -103,7 +103,7 @@ export function GroupsScreen({ userId, onOpenGroup }: GroupsScreenProps) {
   return (
     <SafeAreaView style={styles.container}>
       <View style={styles.header}>
-        <Text style={styles.title}>My Groups</Text>
+        <Text style={styles.title}>Groups</Text>
       </View>
 
       {loading ? (
@@ -120,6 +120,7 @@ export function GroupsScreen({ userId, onOpenGroup }: GroupsScreenProps) {
           onRefresh={onRefresh}
           refreshing={refreshing}
           showsVerticalScrollIndicator={false}
+          indicatorStyle="white"
         />
       )}
     </SafeAreaView>
@@ -208,12 +209,12 @@ const styles = StyleSheet.create({
   emptyTitle: {
     fontSize: SIZES.sectionTitle,
     fontWeight: '700',
-    color: COLORS.textPrimary,
+    color: COLORS.textSecondary,
     marginBottom: 8,
   },
   emptySubtitle: {
     fontSize: SIZES.body,
-    color: COLORS.textSecondary,
+    color: COLORS.textMuted,
     textAlign: 'center',
     paddingHorizontal: 40,
   },

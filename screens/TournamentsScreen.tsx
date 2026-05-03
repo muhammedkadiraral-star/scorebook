@@ -160,11 +160,11 @@ export function TournamentsScreen({ userId, onOpenTournament }: TournamentsScree
     let label = status.charAt(0).toUpperCase() + status.slice(1).replace('_', ' ');
 
     if (status === 'open') {
-      bgColor = '#DCFCE7';
-      textColor = '#16A34A';
+      bgColor = COLORS.successMuted;
+      textColor = COLORS.success;
     } else if (status === 'in_progress') {
-      bgColor = '#DBEAFE';
-      textColor = '#2563EB';
+      bgColor = COLORS.primaryMuted;
+      textColor = COLORS.primary;
     } else if (status === 'completed') {
       bgColor = COLORS.surface;
       textColor = COLORS.textMuted;
@@ -227,7 +227,7 @@ export function TournamentsScreen({ userId, onOpenTournament }: TournamentsScree
       {loading ? (
         <View style={styles.center}><ActivityIndicator color={COLORS.primary} /></View>
       ) : (
-        <ScrollView contentContainerStyle={styles.scrollContent} showsVerticalScrollIndicator={false}>
+        <ScrollView contentContainerStyle={styles.scrollContent} showsVerticalScrollIndicator={false} indicatorStyle="white">
           {/* My Tournaments */}
           <Text style={styles.sectionHeader}>My Tournaments</Text>
           {filteredMy.length === 0 ? (
@@ -302,7 +302,7 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: 'transparent',
   },
-  filterChipActive: { backgroundColor: '#EFF6FF', borderColor: COLORS.primary },
+  filterChipActive: { backgroundColor: COLORS.primaryMuted, borderColor: COLORS.primary },
   filterText: { fontSize: 14, fontWeight: '600', color: COLORS.textSecondary },
   filterTextActive: { color: COLORS.primary },
   card: {
@@ -337,7 +337,7 @@ const styles = StyleSheet.create({
     borderRadius: 8, 
     backgroundColor: COLORS.primary 
   },
-  joinBtnText: { color: '#FFFFFF', fontSize: 13, fontWeight: '700' },
+  joinBtnText: { color: COLORS.textInverse, fontSize: 13, fontWeight: '700' },
   emptyDiscover: { alignItems: 'center', marginTop: 40, gap: 12 },
   emptyDiscoverText: { color: COLORS.textMuted, fontSize: 14 },
 });

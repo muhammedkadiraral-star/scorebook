@@ -1,6 +1,8 @@
 import { useState } from 'react';
 import { ActivityIndicator, Alert, Pressable, SafeAreaView, StyleSheet, Text, TextInput, View } from 'react-native';
+import { StatusBar } from 'expo-status-bar';
 import { supabase } from '../lib/supabase';
+import { COLORS, RADIUS, SIZES, SPACING } from '../constants/theme';
 
 type SetNameScreenProps = {
   userId: string;
@@ -37,8 +39,9 @@ export function SetNameScreen({ userId, onCompleted }: SetNameScreenProps) {
 
   return (
     <SafeAreaView style={styles.container}>
-      <View style={styles.card}>
-        <Text style={styles.title}>Set your name</Text>
+      <StatusBar style="light" />
+      <View style={styles.content}>
+        <Text style={styles.title}>What should we call you?</Text>
         <Text style={styles.subtitle}>Choose a display name your friends can recognize.</Text>
 
         <TextInput
@@ -48,11 +51,11 @@ export function SetNameScreen({ userId, onCompleted }: SetNameScreenProps) {
           style={styles.input}
           autoCapitalize="words"
           autoCorrect={false}
-          placeholderTextColor="#94A3B8"
+          placeholderTextColor="#4B5563"
         />
 
         <Pressable style={[styles.button, saving && styles.buttonDisabled]} onPress={handleContinue} disabled={saving}>
-          {saving ? <ActivityIndicator color="#FFFFFF" /> : <Text style={styles.buttonText}>Continue</Text>}
+          {saving ? <ActivityIndicator color={COLORS.textInverse} /> : <Text style={styles.buttonText}>Continue</Text>}
         </Pressable>
       </View>
     </SafeAreaView>
@@ -62,51 +65,39 @@ export function SetNameScreen({ userId, onCompleted }: SetNameScreenProps) {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#FFFFFF',
-    justifyContent: 'center',
-    alignItems: 'center',
-    padding: 20,
+    backgroundColor: COLORS.background,
   },
-  card: {
-    width: '100%',
-    maxWidth: 420,
-    backgroundColor: '#FFFFFF',
-    borderRadius: 16,
+  content: {
+    flex: 1,
+    justifyContent: 'center',
     padding: 24,
-    shadowColor: '#000',
-    shadowOpacity: 0.05,
-    shadowRadius: 16,
-    shadowOffset: { width: 0, height: 8 },
-    elevation: 3,
-    borderWidth: 1,
-    borderColor: '#E5E7EB',
   },
   title: {
     fontSize: 28,
     fontWeight: '700',
-    color: '#1A1A1A',
+    color: COLORS.textPrimary,
     marginBottom: 8,
   },
   subtitle: {
     fontSize: 14,
-    color: '#6B7280',
-    marginBottom: 20,
+    color: COLORS.textMuted,
+    marginBottom: 24,
   },
   input: {
+    height: 48,
     borderWidth: 1,
-    borderColor: '#E5E7EB',
-    backgroundColor: '#F3F4F6',
+    borderColor: COLORS.border,
+    backgroundColor: COLORS.card,
     borderRadius: 12,
     paddingHorizontal: 14,
-    paddingVertical: 12,
     fontSize: 16,
-    color: '#1A1A1A',
+    color: COLORS.textPrimary,
     marginBottom: 20,
   },
   button: {
     height: 48,
     borderRadius: 12,
-    backgroundColor: '#3B82F6',
+    backgroundColor: COLORS.primary,
     justifyContent: 'center',
     alignItems: 'center',
   },
@@ -114,7 +105,7 @@ const styles = StyleSheet.create({
     opacity: 0.7,
   },
   buttonText: {
-    color: '#FFFFFF',
+    color: COLORS.textInverse,
     fontSize: 16,
     fontWeight: '600',
   },

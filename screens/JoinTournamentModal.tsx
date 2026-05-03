@@ -11,7 +11,7 @@ import {
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { supabase } from '../lib/supabase';
-import { COLORS, RADIUS, SPACING } from '../constants/theme';
+import { COLORS, RADIUS, SIZES, SPACING } from '../constants/theme';
 
 type JoinTournamentModalProps = {
   visible: boolean;
@@ -106,7 +106,7 @@ export function JoinTournamentModal({ visible, userId, onClose, onJoined }: Join
               onPress={handleJoin}
               disabled={!code.trim() || loading}
             >
-              {loading ? <ActivityIndicator color="#FFFFFF" /> : <Text style={styles.joinButtonText}>Join Tournament</Text>}
+              {loading ? <ActivityIndicator color={COLORS.textInverse} /> : <Text style={styles.joinButtonText}>Join Tournament</Text>}
             </Pressable>
           </View>
         </Pressable>
@@ -118,11 +118,11 @@ export function JoinTournamentModal({ visible, userId, onClose, onJoined }: Join
 const styles = StyleSheet.create({
   overlay: {
     flex: 1,
-    backgroundColor: 'rgba(0,0,0,0.4)',
+    backgroundColor: 'rgba(0,0,0,0.6)',
     justifyContent: 'flex-end',
   },
   content: {
-    backgroundColor: '#FFFFFF',
+    backgroundColor: COLORS.card,
     borderTopLeftRadius: 24,
     borderTopRightRadius: 24,
     paddingHorizontal: 24,
@@ -150,7 +150,7 @@ const styles = StyleSheet.create({
   },
   input: {
     height: 52,
-    backgroundColor: COLORS.background,
+    backgroundColor: COLORS.backgroundSecondary,
     borderWidth: 1,
     borderColor: COLORS.border,
     borderRadius: RADIUS.input,
@@ -170,7 +170,7 @@ const styles = StyleSheet.create({
     backgroundColor: COLORS.textMuted,
   },
   joinButtonText: {
-    color: '#FFFFFF',
+    color: COLORS.textInverse,
     fontSize: 16,
     fontWeight: '700',
   },

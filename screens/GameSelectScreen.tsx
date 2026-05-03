@@ -84,6 +84,7 @@ export function GameSelectScreen({ userId, onBack, onSelectGame }: GameSelectScr
         ItemSeparatorComponent={() => <View style={styles.separator} />}
         contentContainerStyle={styles.list}
         showsVerticalScrollIndicator={false}
+        indicatorStyle="white"
       />
     </SafeAreaView>
   );
@@ -157,7 +158,7 @@ const styles = StyleSheet.create({
     borderRadius: RADIUS.pill,
   },
   badgeText: {
-    color: '#FFFFFF',
+    color: COLORS.textInverse,
     fontSize: 12,
     fontWeight: '700',
   },

@@ -260,7 +260,7 @@ export function GroupDetailScreen({ groupId, groupName, userId, onBack, onAddMat
     }
     const initial = name.trim().charAt(0).toUpperCase() || 'P';
     return (
-      <View style={{ width: size, height: size, borderRadius: size / 2, backgroundColor: '#EFF6FF', justifyContent: 'center', alignItems: 'center' }}>
+      <View style={{ width: size, height: size, borderRadius: size / 2, backgroundColor: COLORS.borderLight, justifyContent: 'center', alignItems: 'center' }}>
         <Text style={{ fontSize: size * 0.45, color: COLORS.primary, fontWeight: '700' }}>{initial}</Text>
       </View>
     );
@@ -318,7 +318,7 @@ export function GroupDetailScreen({ groupId, groupName, userId, onBack, onAddMat
       </View>
 
       {loading ? <View style={styles.center}><ActivityIndicator color={COLORS.primary} /></View> : (
-        <ScrollView contentContainerStyle={styles.scrollContent} showsVerticalScrollIndicator={false}>
+        <ScrollView contentContainerStyle={styles.scrollContent} showsVerticalScrollIndicator={false} indicatorStyle="white">
           {activeTab === 'matches' && (
             <View style={styles.section}>
               {matches.length === 0 ? <Text style={styles.emptyText}>No matches recorded yet.</Text> : matches.map(renderMatchCard)}
@@ -370,7 +370,7 @@ export function GroupDetailScreen({ groupId, groupName, userId, onBack, onAddMat
 
       {activeTab === 'matches' && (
         <Pressable style={styles.fab} onPress={() => onAddMatch(members)}>
-          <Ionicons name="add" size={32} color="#FFFFFF" />
+          <Ionicons name="add" size={32} color={COLORS.textInverse} />
         </Pressable>
       )}
 
@@ -428,8 +428,8 @@ const styles = StyleSheet.create({
   tabContainer: { paddingHorizontal: SPACING.screenPadding, paddingVertical: 12 },
   tabPill: { height: 48, backgroundColor: COLORS.surface, borderRadius: RADIUS.pill, flexDirection: 'row', padding: 4 },
   tab: { flex: 1, borderRadius: RADIUS.pill, justifyContent: 'center', alignItems: 'center' },
-  tabActive: { backgroundColor: '#FFFFFF', shadowColor: '#000', shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.1, shadowRadius: 4, elevation: 2 },
-  tabText: { fontSize: 13, fontWeight: '600', color: COLORS.textSecondary },
+  tabActive: { backgroundColor: COLORS.card, shadowColor: '#000', shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.3, shadowRadius: 4, elevation: 2 },
+  tabText: { fontSize: 13, fontWeight: '600', color: COLORS.textMuted },
   tabTextActive: { color: COLORS.primary },
   center: { flex: 1, justifyContent: 'center', alignItems: 'center' },
   scrollContent: { padding: SPACING.screenPadding, paddingBottom: 100 },
@@ -463,16 +463,16 @@ const styles = StyleSheet.create({
   h2hBarContainer: { height: 8, borderRadius: 4, flexDirection: 'row', overflow: 'hidden' },
   h2hBarPart: { height: '100%' },
   fab: { position: 'absolute', right: 24, bottom: 24, width: 56, height: 56, borderRadius: 28, backgroundColor: COLORS.primary, justifyContent: 'center', alignItems: 'center', shadowColor: COLORS.primary, shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.3, shadowRadius: 8, elevation: 4 },
-  modalOverlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.4)', justifyContent: 'flex-end' },
-  modalContent: { backgroundColor: '#FFFFFF', borderTopLeftRadius: 24, borderTopRightRadius: 24, padding: 24 },
+  modalOverlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.6)', justifyContent: 'flex-end' },
+  modalContent: { backgroundColor: COLORS.card, borderTopLeftRadius: 24, borderTopRightRadius: 24, padding: 24 },
   modalHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 20 },
   modalTitle: { fontSize: 20, fontWeight: '700', color: COLORS.textPrimary },
   modalItem: { flexDirection: 'row', alignItems: 'center', gap: 12, paddingVertical: 12, borderBottomWidth: 1, borderBottomColor: COLORS.border },
   modalItemText: { fontSize: 16, color: COLORS.textPrimary },
-  actionSheet: { backgroundColor: '#FFFFFF', borderTopLeftRadius: 28, borderTopRightRadius: 28, padding: 24, paddingBottom: 40, width: '100%' },
+  actionSheet: { backgroundColor: COLORS.card, borderTopLeftRadius: 28, borderTopRightRadius: 28, padding: 24, paddingBottom: 40, width: '100%' },
   actionItem: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingVertical: 16 },
   actionItemText: { fontSize: 17, fontWeight: '600' },
   actionDivider: { height: 1, backgroundColor: COLORS.border },
-  actionCancel: { marginTop: 16, height: 52, borderRadius: RADIUS.button, backgroundColor: COLORS.surface, justifyContent: 'center', alignItems: 'center' },
+  actionCancel: { marginTop: 16, height: 52, borderRadius: RADIUS.button, backgroundColor: COLORS.backgroundSecondary, justifyContent: 'center', alignItems: 'center' },
   actionCancelText: { fontSize: 16, fontWeight: '700', color: COLORS.textSecondary },
 });

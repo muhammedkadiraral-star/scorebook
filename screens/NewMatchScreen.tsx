@@ -266,7 +266,7 @@ export function NewMatchScreen({ groupId, groupName, members: initialMembers, on
     }
     const initial = name.trim().charAt(0).toUpperCase() || 'P';
     return (
-      <View style={{ width: size, height: size, borderRadius: size / 2, backgroundColor: '#EFF6FF', justifyContent: 'center', alignItems: 'center' }}>
+      <View style={{ width: size, height: size, borderRadius: size / 2, backgroundColor: COLORS.borderLight, justifyContent: 'center', alignItems: 'center' }}>
         <Text style={{ fontSize: size * 0.45, color: COLORS.primary, fontWeight: '700' }}>{initial}</Text>
       </View>
     );
@@ -282,7 +282,7 @@ export function NewMatchScreen({ groupId, groupName, members: initialMembers, on
         <View style={styles.headerButton} />
       </View>
 
-      <ScrollView contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
+      <ScrollView contentContainerStyle={styles.content} showsVerticalScrollIndicator={false} indicatorStyle="white">
         <View style={styles.playerSelectionRow}>
           <View style={styles.playerCol}>
             <Text style={styles.label}>Home Player</Text>
@@ -329,17 +329,17 @@ export function NewMatchScreen({ groupId, groupName, members: initialMembers, on
             <View style={styles.scoreColumn}>
               <Text style={styles.scoreLabel}>Home</Text>
               <View style={styles.scoreCounter}>
-                <Pressable style={styles.scoreBtn} onPress={() => changeScore('home', -1)}><Ionicons name="remove" size={24} color="#FFFFFF" /></Pressable>
+                <Pressable style={styles.scoreBtn} onPress={() => changeScore('home', -1)}><Ionicons name="remove" size={24} color={COLORS.textInverse} /></Pressable>
                 <TextInput value={String(homeScore)} onChangeText={(v) => setHomeScore(parseScore(v))} keyboardType="number-pad" style={styles.scoreInput} selectTextOnFocus />
-                <Pressable style={styles.scoreBtn} onPress={() => changeScore('home', 1)}><Ionicons name="add" size={24} color="#FFFFFF" /></Pressable>
+                <Pressable style={styles.scoreBtn} onPress={() => changeScore('home', 1)}><Ionicons name="add" size={24} color={COLORS.textInverse} /></Pressable>
               </View>
             </View>
             <View style={styles.scoreColumn}>
               <Text style={styles.scoreLabel}>Away</Text>
               <View style={styles.scoreCounter}>
-                <Pressable style={styles.scoreBtn} onPress={() => changeScore('away', -1)}><Ionicons name="remove" size={24} color="#FFFFFF" /></Pressable>
+                <Pressable style={styles.scoreBtn} onPress={() => changeScore('away', -1)}><Ionicons name="remove" size={24} color={COLORS.textInverse} /></Pressable>
                 <TextInput value={String(awayScore)} onChangeText={(v) => setAwayScore(parseScore(v))} keyboardType="number-pad" style={styles.scoreInput} selectTextOnFocus />
-                <Pressable style={styles.scoreBtn} onPress={() => changeScore('away', 1)}><Ionicons name="add" size={24} color="#FFFFFF" /></Pressable>
+                <Pressable style={styles.scoreBtn} onPress={() => changeScore('away', 1)}><Ionicons name="add" size={24} color={COLORS.textInverse} /></Pressable>
               </View>
             </View>
           </View>
@@ -364,7 +364,7 @@ export function NewMatchScreen({ groupId, groupName, members: initialMembers, on
 
         <View style={styles.footer}>
           <Pressable style={[styles.saveButton, saving && styles.saveDisabled]} onPress={saveMatch} disabled={saving}>
-            {saving ? <ActivityIndicator color="#FFFFFF" /> : <Text style={styles.saveText}>Save Match</Text>}
+            {saving ? <ActivityIndicator color={COLORS.textInverse} /> : <Text style={styles.saveText}>Save Match</Text>}
           </Pressable>
         </View>
       </ScrollView>
@@ -415,7 +415,7 @@ const styles = StyleSheet.create({
   selectorText: { color: COLORS.textPrimary, fontWeight: '500', fontSize: 14, flex: 1 },
   placeholderText: { color: COLORS.textMuted, fontSize: 14 },
   teamsRow: { flexDirection: 'row', gap: 12, marginBottom: 24 },
-  input: { height: 52, backgroundColor: COLORS.background, borderWidth: 1, borderColor: COLORS.border, borderRadius: RADIUS.input, paddingHorizontal: 12, fontSize: 14, color: COLORS.textPrimary },
+  input: { height: 52, backgroundColor: COLORS.card, borderWidth: 1, borderColor: COLORS.border, borderRadius: RADIUS.input, paddingHorizontal: 12, fontSize: 14, color: COLORS.textPrimary },
   scoreSection: { marginBottom: 24 },
   scoreRow: { flexDirection: 'row', gap: 24 },
   scoreColumn: { flex: 1, alignItems: 'center' },
@@ -432,16 +432,16 @@ const styles = StyleSheet.create({
   footer: { marginTop: 32, marginBottom: 40 },
   saveButton: { height: 56, backgroundColor: COLORS.primary, borderRadius: RADIUS.button, justifyContent: 'center', alignItems: 'center' },
   saveDisabled: { opacity: 0.7 },
-  saveText: { color: '#FFFFFF', fontSize: 17, fontWeight: '700' },
-  modalOverlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.4)', justifyContent: 'flex-end' },
-  modalContent: { backgroundColor: '#FFFFFF', borderTopLeftRadius: 24, borderTopRightRadius: 24, padding: 24, maxHeight: '80%' },
+  saveText: { color: COLORS.textInverse, fontSize: 17, fontWeight: '700' },
+  modalOverlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.6)', justifyContent: 'flex-end' },
+  modalContent: { backgroundColor: COLORS.card, borderTopLeftRadius: 24, borderTopRightRadius: 24, padding: 24, maxHeight: '80%' },
   modalHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 20 },
   modalTitle: { fontSize: 20, fontWeight: '700', color: COLORS.textPrimary },
   memberList: { maxHeight: 300 },
   memberItem: { flexDirection: 'row', alignItems: 'center', gap: 12, paddingVertical: 12, borderBottomWidth: 1, borderBottomColor: COLORS.border },
   memberText: { fontSize: 16, color: COLORS.textPrimary },
   guestForm: { flexDirection: 'row', gap: 12, marginTop: 16, paddingTop: 16, borderTopWidth: 1, borderTopColor: COLORS.border },
-  guestInput: { flex: 1, height: 44, backgroundColor: COLORS.surface, borderRadius: 12, paddingHorizontal: 12, fontSize: 14 },
+  guestInput: { flex: 1, height: 44, backgroundColor: COLORS.backgroundSecondary, borderRadius: 12, paddingHorizontal: 12, fontSize: 14, color: COLORS.textPrimary },
   guestAddBtn: { backgroundColor: COLORS.primary, paddingHorizontal: 16, height: 44, borderRadius: 12, justifyContent: 'center' },
-  guestAddBtnText: { color: '#FFFFFF', fontWeight: '700' }
+  guestAddBtnText: { color: COLORS.textInverse, fontWeight: '700' }
 });

@@ -1,9 +1,10 @@
 import { useEffect, useState } from 'react';
-import { ActivityIndicator, Alert, Modal, Pressable, SafeAreaView, StyleSheet, Text, TextInput, View } from 'react-native';
+import { ActivityIndicator, Alert, Modal, Pressable, SafeAreaView, StyleSheet, Text, TextInput, View, KeyboardAvoidingView, Platform } from 'react-native';
 import { StatusBar } from 'expo-status-bar';
 import type { Session, User } from '@supabase/supabase-js';
 import { Ionicons } from '@expo/vector-icons';
 import { supabase } from './lib/supabase';
+import { COLORS, RADIUS, SIZES, SPACING } from './constants/theme';
 import { GroupsScreen } from './screens/GroupsScreen';
 import { GroupDetailScreen, type GroupMemberOption } from './screens/GroupDetailScreen';
 import { NewMatchScreen } from './screens/NewMatchScreen';
@@ -227,8 +228,8 @@ export default function App() {
   if (session && checkingUserRecord) {
     return (
       <SafeAreaView style={styles.container}>
-        <StatusBar style="dark" />
-        <ActivityIndicator color="#3B82F6" />
+        <StatusBar style="light" />
+        <ActivityIndicator color={COLORS.primary} />
       </SafeAreaView>
     );
   }
@@ -341,7 +342,7 @@ export default function App() {
     if (route.name === 'groups' || route.name === 'profile' || route.name === 'notifications' || route.name === 'tournaments') {
       return (
         <View style={styles.mainTabWrapper}>
-          <StatusBar style="dark" />
+          <StatusBar style="light" />
           <View style={styles.mainContent}>
             {route.name === 'groups' && (
               <GroupsScreen
@@ -383,10 +384,10 @@ export default function App() {
             <View style={styles.tabBarContainer}>
               <View style={styles.tabPill}>
                 <Pressable style={styles.tabItem} onPress={() => setRoute({ name: 'groups' })}>
-                  <Ionicons name="game-controller" size={24} color={route.name === 'groups' ? '#3B82F6' : '#9CA3AF'} />
+                  <Ionicons name="game-controller" size={24} color={route.name === 'groups' ? COLORS.primary : COLORS.textMuted} />
                 </Pressable>
                 <Pressable style={styles.tabItem} onPress={() => setRoute({ name: 'tournaments' })}>
-                  <Ionicons name="trophy" size={24} color={route.name === 'tournaments' ? '#3B82F6' : '#9CA3AF'} />
+                  <Ionicons name="trophy" size={24} color={route.name === 'tournaments' ? COLORS.primary : COLORS.textMuted} />
                 </Pressable>
                 <Pressable 
                   style={styles.tabItem} 
@@ -396,16 +397,16 @@ export default function App() {
                   }}
                 >
                   <View>
-                    <Ionicons name="notifications" size={24} color={route.name === 'notifications' ? '#3B82F6' : '#9CA3AF'} />
+                    <Ionicons name="notifications" size={24} color={route.name === 'notifications' ? COLORS.primary : COLORS.textMuted} />
                     {unreadCount > 0 && <View style={styles.unreadBadge} />}
                   </View>
                 </Pressable>
                 <Pressable style={styles.tabItem} onPress={() => setRoute({ name: 'profile' })}>
-                  <Ionicons name="person" size={24} color={route.name === 'profile' ? '#3B82F6' : '#9CA3AF'} />
+                  <Ionicons name="person" size={24} color={route.name === 'profile' ? COLORS.primary : COLORS.textMuted} />
                 </Pressable>
               </View>
               <Pressable style={styles.plusButton} onPress={() => setShowPlusModal(true)}>
-                <Ionicons name="add" size={32} color="#FFFFFF" />
+                <Ionicons name="add" size={32} color={COLORS.textInverse} />
               </Pressable>
             </View>
           </SafeAreaView>
@@ -422,10 +423,10 @@ export default function App() {
                   }}
                 >
                   <View style={{ flexDirection: 'row', alignItems: 'center', gap: 12 }}>
-                    <Ionicons name="add-circle-outline" size={24} color="#111827" />
+                    <Ionicons name="add-circle-outline" size={24} color={COLORS.primary} />
                     <Text style={styles.actionItemText}>Create Group</Text>
                   </View>
-                  <Ionicons name="chevron-forward" size={20} color="#9CA3AF" />
+                  <Ionicons name="chevron-forward" size={20} color={COLORS.textMuted} />
                 </Pressable>
                 <View style={styles.actionDivider} />
                 <Pressable
@@ -436,10 +437,10 @@ export default function App() {
                   }}
                 >
                   <View style={{ flexDirection: 'row', alignItems: 'center', gap: 12 }}>
-                    <Ionicons name="enter-outline" size={24} color="#111827" />
+                    <Ionicons name="enter-outline" size={24} color={COLORS.primary} />
                     <Text style={styles.actionItemText}>Join Group</Text>
                   </View>
-                  <Ionicons name="chevron-forward" size={20} color="#9CA3AF" />
+                  <Ionicons name="chevron-forward" size={20} color={COLORS.textMuted} />
                 </Pressable>
                 <View style={styles.actionDivider} />
                 <Pressable
@@ -450,10 +451,10 @@ export default function App() {
                   }}
                 >
                   <View style={{ flexDirection: 'row', alignItems: 'center', gap: 12 }}>
-                    <Ionicons name="trophy-outline" size={24} color="#111827" />
+                    <Ionicons name="trophy-outline" size={24} color={COLORS.primary} />
                     <Text style={styles.actionItemText}>Create Tournament</Text>
                   </View>
-                  <Ionicons name="chevron-forward" size={20} color="#9CA3AF" />
+                  <Ionicons name="chevron-forward" size={20} color={COLORS.textMuted} />
                 </Pressable>
                 <View style={styles.actionDivider} />
                 <Pressable
@@ -464,10 +465,10 @@ export default function App() {
                   }}
                 >
                   <View style={{ flexDirection: 'row', alignItems: 'center', gap: 12 }}>
-                    <Ionicons name="ticket-outline" size={24} color="#111827" />
+                    <Ionicons name="ticket-outline" size={24} color={COLORS.primary} />
                     <Text style={styles.actionItemText}>Join Tournament</Text>
                   </View>
-                  <Ionicons name="chevron-forward" size={20} color="#9CA3AF" />
+                  <Ionicons name="chevron-forward" size={20} color={COLORS.textMuted} />
                 </Pressable>
                 <Pressable style={styles.actionCancel} onPress={() => setShowPlusModal(false)}>
                   <Text style={styles.actionCancelText}>Cancel</Text>
@@ -499,53 +500,107 @@ export default function App() {
   }
 
   return (
-    <SafeAreaView style={styles.container}>
-      <StatusBar style="dark" />
-      <View style={styles.card}>
-        <Text style={styles.title}>{isSignUpMode ? 'Create Account' : 'Welcome Back'}</Text>
-        <Text style={styles.subtitle}>
-          {isSignUpMode ? 'Sign up with your email and password' : 'Sign in to continue'}
-        </Text>
+    <SafeAreaView style={styles.authContainer}>
+      <StatusBar style="light" />
+      <KeyboardAvoidingView
+        style={{ flex: 1 }}
+        behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+      >
+        <View style={styles.authContent}>
+          <View style={styles.brandArea}>
+            <View style={{ flexDirection: 'row' }}>
+              <Text style={styles.logoPart1}>Score</Text>
+              <Text style={styles.logoPart2}>Book</Text>
+            </View>
+            <Text style={styles.tagline}>
+              {isSignUpMode ? 'Your games. Your stats. Your legacy.' : 'Track. Compete. Prove it.'}
+            </Text>
+          </View>
 
-        <TextInput
-          value={email}
-          onChangeText={setEmail}
-          placeholder="Email"
-          keyboardType="email-address"
-          autoCapitalize="none"
-          autoCorrect={false}
-          style={styles.input}
-          placeholderTextColor="#6B7280"
-        />
-        <TextInput
-          value={password}
-          onChangeText={setPassword}
-          placeholder="Password"
-          secureTextEntry
-          autoCapitalize="none"
-          autoCorrect={false}
-          style={styles.input}
-          placeholderTextColor="#6B7280"
-        />
+          <Pressable
+            style={styles.appleButton}
+            onPress={() => Alert.alert('Coming soon', 'Apple sign-in will be available soon.')}
+          >
+            <Ionicons name="logo-apple" size={20} color="#111" />
+            <Text style={styles.appleButtonText}>Continue with Apple</Text>
+          </Pressable>
 
-        <Pressable
-          style={[styles.button, loading && styles.buttonDisabled]}
-          onPress={handleAuth}
-          disabled={loading}
-        >
-          {loading ? (
-            <ActivityIndicator color="#FFFFFF" />
-          ) : (
-            <Text style={styles.buttonText}>{isSignUpMode ? 'Sign Up' : 'Sign In'}</Text>
+          <Pressable
+            style={styles.googleButton}
+            onPress={() => Alert.alert('Coming soon', 'Google sign-in will be available soon.')}
+          >
+            <Ionicons name="logo-google" size={18} color="#4285F4" />
+            <Text style={styles.googleButtonText}>Continue with Google</Text>
+          </Pressable>
+
+          <View style={styles.dividerRow}>
+            <View style={styles.dividerLine} />
+            <Text style={styles.dividerText}>
+              {isSignUpMode ? 'or sign up with email' : 'or'}
+            </Text>
+            <View style={styles.dividerLine} />
+          </View>
+
+          <TextInput
+            value={email}
+            onChangeText={setEmail}
+            placeholder="Email"
+            keyboardType="email-address"
+            autoCapitalize="none"
+            autoCorrect={false}
+            style={styles.authInput}
+            placeholderTextColor={COLORS.textMuted}
+          />
+          <TextInput
+            value={password}
+            onChangeText={setPassword}
+            placeholder="Password"
+            secureTextEntry
+            autoCapitalize="none"
+            autoCorrect={false}
+            style={[styles.authInput, { marginTop: 10 }]}
+            placeholderTextColor={COLORS.textMuted}
+          />
+
+          <Pressable
+            style={[styles.primaryButton, loading && { opacity: 0.7 }]}
+            onPress={handleAuth}
+            disabled={loading}
+          >
+            {loading ? (
+              <ActivityIndicator color={COLORS.textInverse} />
+            ) : (
+              <Text style={styles.primaryButtonText}>
+                {isSignUpMode ? 'Create account' : 'Sign in'}
+              </Text>
+            )}
+          </Pressable>
+
+          {isSignUpMode && (
+            <Text style={styles.termsText}>
+              By signing up, you agree to our Terms and Privacy Policy.
+            </Text>
           )}
-        </Pressable>
+        </View>
 
-        <Pressable onPress={() => setIsSignUpMode((prev) => !prev)} disabled={loading}>
-          <Text style={styles.toggleText}>
-            {isSignUpMode ? 'Already have an account? Sign In' : "Don't have an account? Sign Up"}
-          </Text>
-        </Pressable>
-      </View>
+        <View style={styles.authFooter}>
+          <Pressable onPress={() => setIsSignUpMode((prev) => !prev)}>
+            <Text style={styles.toggleText}>
+              {isSignUpMode ? (
+                <>
+                  <Text style={{ color: COLORS.textMuted }}>Already have an account? </Text>
+                  <Text style={{ color: COLORS.primary, fontWeight: '500' }}>Sign in</Text>
+                </>
+              ) : (
+                <>
+                  <Text style={{ color: COLORS.textMuted }}>Don't have an account? </Text>
+                  <Text style={{ color: COLORS.primary, fontWeight: '500' }}>Sign up</Text>
+                </>
+              )}
+            </Text>
+          </Pressable>
+        </View>
+      </KeyboardAvoidingView>
     </SafeAreaView>
   );
 }
@@ -553,81 +608,132 @@ export default function App() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#FFFFFF',
+    backgroundColor: COLORS.background,
     justifyContent: 'center',
     alignItems: 'center',
-    padding: 20,
   },
-  card: {
-    width: '100%',
-    maxWidth: 420,
-    backgroundColor: '#FFFFFF',
-    borderRadius: 16,
-    padding: 24,
-    shadowColor: '#000',
-    shadowOpacity: 0.05,
-    shadowRadius: 16,
-    shadowOffset: { width: 0, height: 8 },
-    elevation: 3,
-    borderWidth: 1,
-    borderColor: '#E5E7EB',
+  authContainer: {
+    flex: 1,
+    backgroundColor: COLORS.background,
   },
-  title: {
-    fontSize: 28,
+  authContent: {
+    flex: 1,
+    justifyContent: 'center',
+    paddingHorizontal: 24,
+  },
+  brandArea: {
+    alignItems: 'center',
+    marginBottom: 32,
+  },
+  logoPart1: {
+    color: COLORS.textPrimary,
+    fontSize: 32,
     fontWeight: '700',
-    color: '#1A1A1A',
-    marginBottom: 8,
   },
-  subtitle: {
+  logoPart2: {
+    color: COLORS.primary,
+    fontSize: 32,
+    fontWeight: '700',
+  },
+  tagline: {
+    color: COLORS.textMuted,
     fontSize: 14,
-    color: '#6B7280',
-    marginBottom: 20,
+    marginTop: 6,
   },
-  input: {
-    borderWidth: 1,
-    borderColor: '#E5E7EB',
-    backgroundColor: '#F3F4F6',
-    borderRadius: 12,
-    paddingHorizontal: 14,
-    paddingVertical: 12,
-    fontSize: 16,
-    color: '#1A1A1A',
-    marginBottom: 12,
-  },
-  button: {
+  appleButton: {
     height: 48,
     borderRadius: 12,
-    backgroundColor: '#3B82F6',
+    backgroundColor: COLORS.appleButton,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 8,
+  },
+  appleButtonText: {
+    color: COLORS.appleButtonText,
+    fontWeight: '500',
+    fontSize: 15,
+  },
+  googleButton: {
+    height: 48,
+    borderRadius: 12,
+    backgroundColor: COLORS.googleButton,
+    borderWidth: 0.5,
+    borderColor: COLORS.googleButtonBorder,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 8,
+    marginTop: 10,
+  },
+  googleButtonText: {
+    color: COLORS.googleButtonText,
+    fontWeight: '500',
+    fontSize: 15,
+  },
+  dividerRow: {
+    marginVertical: 20,
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  dividerLine: {
+    flex: 1,
+    height: 0.5,
+    backgroundColor: COLORS.border,
+  },
+  dividerText: {
+    color: COLORS.textMuted,
+    fontSize: 12,
+    marginHorizontal: 12,
+  },
+  authInput: {
+    height: 48,
+    borderRadius: 12,
+    backgroundColor: COLORS.card,
+    borderWidth: 0.5,
+    borderColor: COLORS.border,
+    color: COLORS.textPrimary,
+    paddingHorizontal: 14,
+    fontSize: 15,
+  },
+  primaryButton: {
+    height: 48,
+    borderRadius: 12,
+    backgroundColor: COLORS.primary,
     justifyContent: 'center',
     alignItems: 'center',
-    marginTop: 8,
+    marginTop: 16,
   },
-  buttonDisabled: {
-    opacity: 0.7,
-  },
-  buttonText: {
-    color: '#FFFFFF',
+  primaryButtonText: {
+    color: COLORS.textInverse,
     fontSize: 16,
     fontWeight: '600',
   },
-  toggleText: {
-    marginTop: 16,
+  termsText: {
+    fontSize: 11,
+    color: COLORS.textMuted,
     textAlign: 'center',
-    color: '#3B82F6',
+    marginTop: 12,
+  },
+  authFooter: {
+    paddingHorizontal: 24,
+    paddingBottom: 36,
+  },
+  toggleText: {
+    textAlign: 'center',
     fontSize: 14,
-    fontWeight: '500',
   },
   mainTabWrapper: {
     flex: 1,
-    backgroundColor: '#FFFFFF',
+    backgroundColor: COLORS.background,
   },
   mainContent: {
     flex: 1,
   },
   tabBarSafeArea: {
-    backgroundColor: '#FFFFFF',
+    backgroundColor: COLORS.backgroundSecondary,
     borderTopWidth: 1,
-    borderTopColor: '#E5E7EB',
+    borderTopColor: COLORS.border,
   },
   tabBarContainer: {
     flexDirection: 'row',
@@ -640,7 +746,7 @@ const styles = StyleSheet.create({
   tabPill: {
     flex: 1,
     flexDirection: 'row',
-    backgroundColor: '#F3F4F6',
+    backgroundColor: COLORS.card,
     borderRadius: 28,
     height: 64,
     paddingHorizontal: 16,
@@ -654,10 +760,10 @@ const styles = StyleSheet.create({
     width: 56,
     height: 56,
     borderRadius: 28,
-    backgroundColor: '#3B82F6',
+    backgroundColor: COLORS.primary,
     justifyContent: 'center',
     alignItems: 'center',
-    shadowColor: '#3B82F6',
+    shadowColor: '#000',
     shadowOffset: { width: 0, height: 4 },
     shadowOpacity: 0.3,
     shadowRadius: 8,
@@ -665,11 +771,11 @@ const styles = StyleSheet.create({
   },
   modalOverlay: {
     flex: 1,
-    backgroundColor: 'rgba(0,0,0,0.4)',
+    backgroundColor: 'rgba(0,0,0,0.6)',
     justifyContent: 'flex-end',
   },
   actionSheet: {
-    backgroundColor: '#FFFFFF',
+    backgroundColor: COLORS.card,
     borderTopLeftRadius: 24,
     borderTopRightRadius: 24,
     paddingTop: 16,
@@ -685,15 +791,15 @@ const styles = StyleSheet.create({
   actionItemText: {
     fontSize: 17,
     fontWeight: '600',
-    color: '#111827',
+    color: COLORS.textPrimary,
   },
   actionDivider: {
     height: 1,
-    backgroundColor: '#E5E7EB',
+    backgroundColor: COLORS.border,
   },
   actionCancel: {
     marginTop: 16,
-    backgroundColor: '#F3F4F6',
+    backgroundColor: COLORS.backgroundSecondary,
     borderRadius: 16,
     height: 56,
     justifyContent: 'center',
@@ -702,7 +808,7 @@ const styles = StyleSheet.create({
   actionCancelText: {
     fontSize: 16,
     fontWeight: '600',
-    color: '#111827',
+    color: COLORS.textPrimary,
   },
   unreadBadge: {
     position: 'absolute',
@@ -711,8 +817,8 @@ const styles = StyleSheet.create({
     width: 10,
     height: 10,
     borderRadius: 5,
-    backgroundColor: '#EF4444',
+    backgroundColor: COLORS.error,
     borderWidth: 1,
-    borderColor: '#F3F4F6',
+    borderColor: COLORS.backgroundSecondary,
   },
 });

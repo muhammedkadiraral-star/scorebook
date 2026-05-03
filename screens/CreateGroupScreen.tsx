@@ -131,7 +131,7 @@ export function CreateGroupScreen({ userId, gameType, onBack, onCreated }: Creat
           disabled={!name.trim() || loading}
         >
           {loading ? (
-            <ActivityIndicator color="#FFFFFF" />
+            <ActivityIndicator color={COLORS.textInverse} />
           ) : (
             <Text style={styles.createButtonText}>Create Group</Text>
           )}
@@ -180,7 +180,7 @@ const styles = StyleSheet.create({
     width: 48,
     height: 48,
     borderRadius: 12,
-    backgroundColor: '#FFFFFF',
+    backgroundColor: COLORS.card,
     justifyContent: 'center',
     alignItems: 'center',
     marginRight: 16,
@@ -209,7 +209,7 @@ const styles = StyleSheet.create({
   },
   input: {
     height: 52,
-    backgroundColor: COLORS.background,
+    backgroundColor: COLORS.card,
     borderWidth: 1,
     borderColor: COLORS.border,
     borderRadius: RADIUS.input,
@@ -231,7 +231,7 @@ const styles = StyleSheet.create({
     backgroundColor: COLORS.textMuted,
   },
   createButtonText: {
-    color: '#FFFFFF',
+    color: COLORS.textInverse,
     fontSize: 16,
     fontWeight: '700',
   },
@@ -286,7 +286,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   doneButtonText: {
-    color: '#FFFFFF',
+    color: COLORS.textInverse,
     fontSize: 16,
     fontWeight: '700',
   },

@@ -237,14 +237,14 @@ export function ProfileScreen({ userId, onSignOut, loadingSignOut }: ProfileScre
 
   return (
     <SafeAreaView style={styles.container}>
-      <ScrollView contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
+      <ScrollView contentContainerStyle={styles.content} showsVerticalScrollIndicator={false} indicatorStyle="white">
         <View style={styles.header}>
           <Pressable style={styles.avatarContainer} onPress={() => setShowAvatarModal(true)}>
             <View style={styles.avatar}>
               <Text style={styles.avatarText}>{avatarUrl ?? initial}</Text>
             </View>
             <View style={styles.editBadge}>
-              <Ionicons name="camera" size={16} color="#FFFFFF" />
+              <Ionicons name="camera" size={16} color={COLORS.textInverse} />
             </View>
           </Pressable>
           <Text style={styles.name}>{displayName}</Text>
@@ -326,7 +326,7 @@ export function ProfileScreen({ userId, onSignOut, loadingSignOut }: ProfileScre
         </View>
 
         <Pressable style={styles.signOutButton} onPress={onSignOut} disabled={loadingSignOut}>
-          {loadingSignOut ? <ActivityIndicator color="#FFFFFF" /> : <Text style={styles.signOutText}>Sign Out</Text>}
+          {loadingSignOut ? <ActivityIndicator color={COLORS.error} /> : <Text style={styles.signOutText}>Sign Out</Text>}
         </Pressable>
       </ScrollView>
 
@@ -353,7 +353,7 @@ export function ProfileScreen({ userId, onSignOut, loadingSignOut }: ProfileScre
                     <Text style={styles.avatarOptionText}>{emoji}</Text>
                     {isSelected && (
                       <View style={styles.checkBadge}>
-                        <Ionicons name="checkmark" size={14} color="#FFFFFF" />
+                        <Ionicons name="checkmark" size={14} color={COLORS.textInverse} />
                       </View>
                     )}
                   </Pressable>
@@ -409,7 +409,7 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     alignItems: 'center',
     borderWidth: 2,
-    borderColor: '#FFFFFF',
+    borderColor: COLORS.background,
   },
   name: {
     fontSize: SIZES.title,
@@ -490,12 +490,12 @@ const styles = StyleSheet.create({
   rivalCard: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: '#FFFFFF',
+    backgroundColor: COLORS.card,
     borderRadius: 20,
     padding: 16,
     marginBottom: 12,
     borderWidth: 1,
-    borderColor: '#E5E7EB',
+    borderColor: COLORS.border,
   },
   rivalAvatar: {
     width: 44,
@@ -516,12 +516,12 @@ const styles = StyleSheet.create({
   rivalName: {
     fontSize: 17,
     fontWeight: '600',
-    color: '#111827',
+    color: COLORS.textPrimary,
     marginBottom: 2,
   },
   rivalSubtitle: {
     fontSize: 14,
-    color: '#6B7280',
+    color: COLORS.textMuted,
   },
   rivalBadges: {
     flexDirection: 'row',
@@ -539,22 +539,22 @@ const styles = StyleSheet.create({
     fontWeight: '600',
   },
   winPill: {
-    backgroundColor: '#DCFCE7',
+    backgroundColor: COLORS.successMuted,
   },
   winPillText: {
-    color: '#16A34A',
+    color: COLORS.success,
   },
   lossPill: {
-    backgroundColor: '#FEE2E2',
+    backgroundColor: COLORS.errorMuted,
   },
   lossPillText: {
-    color: '#DC2626',
+    color: COLORS.error,
   },
   drawPill: {
-    backgroundColor: '#FEF3C7',
+    backgroundColor: COLORS.warningMuted,
   },
   drawPillText: {
-    color: '#D97706',
+    color: COLORS.warning,
   },
   signOutButton: {
     height: 52,
@@ -575,11 +575,11 @@ const styles = StyleSheet.create({
   },
   modalOverlay: {
     flex: 1,
-    backgroundColor: 'rgba(0,0,0,0.4)',
+    backgroundColor: 'rgba(0,0,0,0.6)',
     justifyContent: 'flex-end',
   },
   modalContent: {
-    backgroundColor: '#FFFFFF',
+    backgroundColor: COLORS.card,
     borderTopLeftRadius: 24,
     borderTopRightRadius: 24,
     paddingHorizontal: 24,
@@ -631,6 +631,6 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     alignItems: 'center',
     borderWidth: 2,
-    borderColor: '#FFFFFF',
+    borderColor: COLORS.card,
   },
 });

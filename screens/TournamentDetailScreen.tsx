@@ -383,7 +383,7 @@ export function TournamentDetailScreen({ userId, tournamentId, onBack }: Tournam
         </Pressable>
       </View>
 
-      <ScrollView contentContainerStyle={styles.scrollContent} showsVerticalScrollIndicator={false}>
+      <ScrollView contentContainerStyle={styles.scrollContent} showsVerticalScrollIndicator={false} indicatorStyle="white">
         {/* Info Card */}
         <View style={styles.infoCard}>
           <View style={styles.infoTop}>
@@ -538,7 +538,7 @@ export function TournamentDetailScreen({ userId, tournamentId, onBack }: Tournam
             <View style={styles.modalActions}>
               <Pressable style={styles.cancelBtn} onPress={() => setScoreModalMatch(null)}><Text style={styles.cancelBtnText}>Cancel</Text></Pressable>
               <Pressable style={styles.saveBtn} onPress={saveScore} disabled={savingScore}>
-                {savingScore ? <ActivityIndicator color="#FFF" /> : <Text style={styles.saveBtnText}>Save Result</Text>}
+                {savingScore ? <ActivityIndicator color={COLORS.textInverse} /> : <Text style={styles.saveBtnText}>Save Result</Text>}
               </Pressable>
             </View>
           </View>
@@ -605,19 +605,19 @@ const styles = StyleSheet.create({
   tab: { flex: 1, height: 40, borderRadius: 10, backgroundColor: COLORS.surface, justifyContent: 'center', alignItems: 'center' },
   tabActive: { backgroundColor: COLORS.primary },
   tabText: { fontSize: 13, fontWeight: '700', color: COLORS.textSecondary },
-  tabTextActive: { color: '#FFFFFF' },
+  tabTextActive: { color: COLORS.textInverse },
   tabContent: { gap: 12 },
   participantItem: { flexDirection: 'row', alignItems: 'center', padding: 12, backgroundColor: COLORS.card, borderRadius: 12, borderWidth: 1, borderColor: COLORS.border },
   avatar: { width: 32, height: 32, borderRadius: 16, backgroundColor: COLORS.surface, justifyContent: 'center', alignItems: 'center', marginRight: 12 },
   participantName: { flex: 1, fontSize: 15, fontWeight: '600', color: COLORS.textPrimary },
-  creatorBadge: { backgroundColor: '#EFF6FF', paddingHorizontal: 6, paddingVertical: 2, borderRadius: 4 },
+  creatorBadge: { backgroundColor: COLORS.primaryMuted, paddingHorizontal: 6, paddingVertical: 2, borderRadius: 4 },
   creatorBadgeText: { fontSize: 10, color: COLORS.primary, fontWeight: '700' },
   actions: { marginTop: 12, gap: 12 },
   mainBtn: { height: 52, backgroundColor: COLORS.primary, borderRadius: RADIUS.button, justifyContent: 'center', alignItems: 'center' },
-  mainBtnText: { color: '#FFFFFF', fontSize: 16, fontWeight: '700' },
+  mainBtnText: { color: COLORS.textInverse, fontSize: 16, fontWeight: '700' },
   tableHeader: { flexDirection: 'row', paddingVertical: 8, borderBottomWidth: 1, borderBottomColor: COLORS.border },
   tableRow: { flexDirection: 'row', paddingVertical: 12, borderBottomWidth: 1, borderBottomColor: COLORS.surface },
-  championRow: { backgroundColor: '#FEFCE8', borderRadius: 8 },
+  championRow: { backgroundColor: COLORS.warningMuted, borderRadius: 8 },
   tableCol: { flex: 1, fontSize: 12, color: COLORS.textSecondary, textAlign: 'center' },
   matchesTitle: { fontSize: 16, fontWeight: '700', marginTop: 16 },
   matchCard: { padding: 12, backgroundColor: COLORS.card, borderRadius: 12, borderWidth: 1, borderColor: COLORS.border, marginBottom: 8 },
@@ -635,22 +635,22 @@ const styles = StyleSheet.create({
   bracketContainer: { gap: 24 },
   leagueMatches: { gap: 12 },
   scoreRow: { flexDirection: 'row', alignItems: 'center', gap: 12, marginBottom: 32 },
-  modalOverlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.4)', justifyContent: 'flex-end' },
-  modalContent: { backgroundColor: '#FFFFFF', borderTopLeftRadius: 24, borderTopRightRadius: 24, padding: 24 },
+  modalOverlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.6)', justifyContent: 'flex-end' },
+  modalContent: { backgroundColor: COLORS.card, borderTopLeftRadius: 24, borderTopRightRadius: 24, padding: 24 },
   modalTitle: { fontSize: 20, fontWeight: '700', color: COLORS.textPrimary, textAlign: 'center', marginBottom: 24 },
   scoreInputGroup: { flex: 1, alignItems: 'center', gap: 8 },
   playerName: { fontSize: 13, color: COLORS.textSecondary, textAlign: 'center' },
-  scoreInput: { width: 64, height: 64, backgroundColor: COLORS.surface, borderRadius: 16, fontSize: 28, fontWeight: '800', textAlign: 'center' },
+  scoreInput: { width: 64, height: 64, backgroundColor: COLORS.backgroundSecondary, borderRadius: 16, fontSize: 28, fontWeight: '800', textAlign: 'center', color: COLORS.textPrimary },
   vsText: { fontSize: 14, fontWeight: '800', color: COLORS.textMuted },
   modalActions: { flexDirection: 'row', gap: 12, marginTop: 24 },
-  cancelBtn: { flex: 1, height: 48, borderRadius: 12, backgroundColor: COLORS.surface, justifyContent: 'center', alignItems: 'center' },
+  cancelBtn: { flex: 1, height: 48, borderRadius: 12, backgroundColor: COLORS.backgroundSecondary, justifyContent: 'center', alignItems: 'center' },
   cancelBtnText: { fontWeight: '700', color: COLORS.textSecondary },
   saveBtn: { flex: 1, height: 48, borderRadius: 12, backgroundColor: COLORS.primary, justifyContent: 'center', alignItems: 'center' },
-  saveBtnText: { fontWeight: '700', color: '#FFF' },
-  actionSheet: { backgroundColor: '#FFFFFF', borderTopLeftRadius: 28, borderTopRightRadius: 28, padding: 24, paddingBottom: 40, width: '100%' },
+  saveBtnText: { fontWeight: '700', color: COLORS.textInverse },
+  actionSheet: { backgroundColor: COLORS.card, borderTopLeftRadius: 28, borderTopRightRadius: 28, padding: 24, paddingBottom: 40, width: '100%' },
   actionItem: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingVertical: 16 },
   actionItemText: { fontSize: 17, fontWeight: '600' },
   actionDivider: { height: 1, backgroundColor: COLORS.border },
-  actionCancel: { marginTop: 16, height: 52, borderRadius: RADIUS.button, backgroundColor: COLORS.surface, justifyContent: 'center', alignItems: 'center' },
+  actionCancel: { marginTop: 16, height: 52, borderRadius: RADIUS.button, backgroundColor: COLORS.backgroundSecondary, justifyContent: 'center', alignItems: 'center' },
   actionCancelText: { fontSize: 16, fontWeight: '700', color: COLORS.textSecondary },
 });

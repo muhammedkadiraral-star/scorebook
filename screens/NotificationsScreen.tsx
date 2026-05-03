@@ -105,6 +105,7 @@ export function NotificationsScreen() {
           ListEmptyComponent={renderEmpty}
           contentContainerStyle={styles.listContent}
           showsVerticalScrollIndicator={false}
+          indicatorStyle="white"
           onRefresh={fetchNotifications}
           refreshing={loading}
         />
@@ -139,12 +140,12 @@ const styles = StyleSheet.create({
     flexGrow: 1,
   },
   notificationCard: {
-    backgroundColor: '#FFFFFF',
+    backgroundColor: COLORS.card,
     borderRadius: 16,
     padding: 16,
     marginBottom: 12,
     borderWidth: 1,
-    borderColor: '#E5E7EB',
+    borderColor: COLORS.border,
     flexDirection: 'row',
     alignItems: 'center',
   },

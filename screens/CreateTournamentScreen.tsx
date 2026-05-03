@@ -119,7 +119,7 @@ export function CreateTournamentScreen({ userId, gameType, onBack, onCreated }: 
         <View style={styles.headerButton} />
       </View>
 
-      <ScrollView contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
+      <ScrollView contentContainerStyle={styles.content} showsVerticalScrollIndicator={false} indicatorStyle="white">
         {/* Selected Game */}
         <Text style={styles.smallLabel}>Selected game</Text>
         <View style={styles.selectedGameCard}>
@@ -237,7 +237,7 @@ export function CreateTournamentScreen({ userId, gameType, onBack, onCreated }: 
           disabled={!name.trim() || loading}
         >
           {loading ? (
-            <ActivityIndicator color="#FFFFFF" />
+            <ActivityIndicator color={COLORS.textInverse} />
           ) : (
             <Text style={styles.createButtonText}>Create Tournament</Text>
           )}
@@ -255,16 +255,16 @@ const styles = StyleSheet.create({
   content: { padding: SPACING.screenPadding },
   smallLabel: { fontSize: 12, color: COLORS.textSecondary, marginBottom: 8 },
   selectedGameCard: { flexDirection: 'row', alignItems: 'center', backgroundColor: COLORS.surface, borderRadius: RADIUS.card, padding: 16, marginBottom: 24 },
-  gameIconContainer: { width: 40, height: 40, borderRadius: 10, backgroundColor: '#FFFFFF', justifyContent: 'center', alignItems: 'center', marginRight: 16 },
+  gameIconContainer: { width: 40, height: 40, borderRadius: 10, backgroundColor: COLORS.card, justifyContent: 'center', alignItems: 'center', marginRight: 16 },
   gameEmoji: { fontSize: 20 },
   gameInfo: { flex: 1 },
   gameNameText: { fontSize: 17, fontWeight: '600', color: COLORS.textPrimary },
   inputLabel: { fontSize: 15, fontWeight: '600', color: COLORS.textPrimary, marginBottom: 8, marginTop: 20 },
-  input: { backgroundColor: COLORS.background, borderWidth: 1, borderColor: COLORS.border, borderRadius: RADIUS.input, paddingHorizontal: 16, paddingVertical: 12, fontSize: 16, color: COLORS.textPrimary },
+  input: { backgroundColor: COLORS.card, borderWidth: 1, borderColor: COLORS.border, borderRadius: RADIUS.input, paddingHorizontal: 16, paddingVertical: 12, fontSize: 16, color: COLORS.textPrimary },
   textArea: { height: 100, textAlignVertical: 'top' },
   formatRow: { flexDirection: 'row', gap: 12, marginTop: 4 },
-  formatCard: { flex: 1, padding: 16, borderRadius: 16, borderWidth: 1, borderColor: COLORS.border, backgroundColor: '#FFFFFF' },
-  formatCardActive: { borderColor: COLORS.primary, backgroundColor: '#EFF6FF' },
+  formatCard: { flex: 1, padding: 16, borderRadius: 16, borderWidth: 1, borderColor: COLORS.border, backgroundColor: COLORS.card },
+  formatCardActive: { borderColor: COLORS.primary, backgroundColor: COLORS.primaryMuted },
   formatIcon: { fontSize: 24, marginBottom: 8 },
   formatTitle: { fontSize: 16, fontWeight: '700', color: COLORS.textPrimary, marginBottom: 4 },
   formatSubtitle: { fontSize: 12, color: COLORS.textSecondary },
@@ -272,17 +272,17 @@ const styles = StyleSheet.create({
   pill: { paddingHorizontal: 20, paddingVertical: 10, borderRadius: RADIUS.pill, backgroundColor: COLORS.surface },
   pillActive: { backgroundColor: COLORS.primary },
   pillText: { fontSize: 14, fontWeight: '600', color: COLORS.textPrimary },
-  pillTextActive: { color: '#FFFFFF' },
+  pillTextActive: { color: COLORS.textInverse },
   segmentedControl: { flexDirection: 'row', backgroundColor: COLORS.surface, borderRadius: 12, padding: 4, marginTop: 4 },
   segment: { flex: 1, height: 40, justifyContent: 'center', alignItems: 'center', borderRadius: 8 },
-  segmentActive: { backgroundColor: '#FFFFFF', shadowColor: '#000', shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.1, shadowRadius: 4, elevation: 2 },
+  segmentActive: { backgroundColor: COLORS.cardHover, shadowColor: '#000', shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.3, shadowRadius: 4, elevation: 2 },
   segmentText: { fontSize: 14, fontWeight: '600', color: COLORS.textSecondary },
   segmentTextActive: { color: COLORS.primary },
   hintText: { fontSize: 12, color: COLORS.textSecondary, marginTop: 8 },
   spacer: { height: 60 },
   createButton: { height: 56, backgroundColor: COLORS.primary, borderRadius: RADIUS.button, justifyContent: 'center', alignItems: 'center', marginBottom: 40 },
   disabledButton: { backgroundColor: COLORS.textMuted },
-  createButtonText: { color: '#FFFFFF', fontSize: 17, fontWeight: '700' },
+  createButtonText: { color: COLORS.textInverse, fontSize: 17, fontWeight: '700' },
   successContent: { flex: 1, padding: SPACING.screenPadding, alignItems: 'center', justifyContent: 'center' },
   successIcon: { marginBottom: 24 },
   successTitle: { fontSize: 28, fontWeight: '700', color: COLORS.textPrimary, marginBottom: 12 },
@@ -291,5 +291,5 @@ const styles = StyleSheet.create({
   codeLabel: { fontSize: 12, fontWeight: '700', color: COLORS.textSecondary, letterSpacing: 1, marginBottom: 12 },
   codeValue: { fontSize: 40, fontWeight: '800', color: COLORS.primary, letterSpacing: 4 },
   doneButton: { width: '100%', height: 52, backgroundColor: COLORS.primary, borderRadius: RADIUS.button, justifyContent: 'center', alignItems: 'center' },
-  doneButtonText: { color: '#FFFFFF', fontSize: 16, fontWeight: '700' },
+  doneButtonText: { color: COLORS.textInverse, fontSize: 16, fontWeight: '700' },
 });
