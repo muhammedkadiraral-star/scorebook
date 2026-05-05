@@ -18,6 +18,9 @@ import { JoinTournamentModal } from './screens/JoinTournamentModal';
 import { TournamentsScreen } from './screens/TournamentsScreen';
 import { CreateTournamentScreen } from './screens/CreateTournamentScreen';
 import { TournamentDetailScreen } from './screens/TournamentDetailScreen';
+import { CreateHostTournamentScreen } from './screens/CreateHostTournamentScreen';
+import { HostTournamentDetailScreen } from './screens/HostTournamentDetailScreen';
+import { HostModeHomeScreen } from './screens/HostModeHomeScreen';
 
 type AppRoute =
   | { name: 'groups' }
@@ -29,6 +32,9 @@ type AppRoute =
   | { name: 'createTournament'; gameType: string }
   | { name: 'groupDetail'; groupId: string; groupName: string }
   | { name: 'tournamentDetail'; tournamentId: string; tournamentName: string }
+  | { name: 'hostModeHome' }
+  | { name: 'createHostTournament' }
+  | { name: 'hostTournamentDetail'; hostTournamentId: string; hostTournamentName: string }
   | { name: 'newMatch'; groupId: string; groupName: string; members: GroupMemberOption[] };
 
 export default function App() {
@@ -328,6 +334,38 @@ export default function App() {
       );
     }
 
+    if (route.name === 'hostModeHome') {
+      return (
+        <HostModeHomeScreen
+          userId={session.user.id}
+          onBack={() => setRoute({ name: 'tournaments' })}
+          onCreateNew={() => setRoute({ name: 'createHostTournament' })}
+          onOpenTournament={(id, name) => setRoute({ name: 'hostTournamentDetail', hostTournamentId: id, hostTournamentName: name })}
+        />
+      );
+    }
+
+    if (route.name === 'createHostTournament') {
+      return (
+        <CreateHostTournamentScreen
+          userId={session.user.id}
+          onBack={() => setRoute({ name: 'hostModeHome' })}
+          onCreated={(id, name) => setRoute({ name: 'hostTournamentDetail', hostTournamentId: id, hostTournamentName: name })}
+        />
+      );
+    }
+
+    if (route.name === 'hostTournamentDetail') {
+      return (
+        <HostTournamentDetailScreen
+          userId={session.user.id}
+          hostTournamentId={route.hostTournamentId}
+          hostTournamentName={route.hostTournamentName}
+          onBack={() => setRoute({ name: 'hostModeHome' })}
+        />
+      );
+    }
+
     if (route.name === 'createGroup') {
       return (
         <CreateGroupScreen
@@ -467,6 +505,20 @@ export default function App() {
                   <View style={{ flexDirection: 'row', alignItems: 'center', gap: 12 }}>
                     <Ionicons name="ticket-outline" size={24} color={COLORS.primary} />
                     <Text style={styles.actionItemText}>Join Tournament</Text>
+                  </View>
+                  <Ionicons name="chevron-forward" size={20} color={COLORS.textMuted} />
+                </Pressable>
+                <View style={styles.actionDivider} />
+                <Pressable
+                  style={styles.actionItem}
+                  onPress={() => {
+                    setShowPlusModal(false);
+                    setRoute({ name: 'hostModeHome' });
+                  }}
+                >
+                  <View style={{ flexDirection: 'row', alignItems: 'center', gap: 12 }}>
+                    <Ionicons name="people-outline" size={24} color={COLORS.primary} />
+                    <Text style={styles.actionItemText}>Host Mode</Text>
                   </View>
                   <Ionicons name="chevron-forward" size={20} color={COLORS.textMuted} />
                 </Pressable>

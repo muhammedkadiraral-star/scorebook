@@ -204,6 +204,24 @@ export function TournamentDetailScreen({ userId, tournamentId, onBack }: Tournam
     return Object.values(stats).sort((a, b) => b.pts - a.pts || b.gd - a.gd || b.gf - a.gf);
   }, [participants, matches, tournament]);
 
+  const leagueChampion = useMemo(() => {
+    if (tournament?.format !== 'league') return null;
+    if (matches.length === 0) return null;
+    const allCompleted = matches.every(m => m.status === 'completed');
+    if (!allCompleted) return null;
+    if (standings.length === 0) return null;
+    return standings[0];
+  }, [tournament, matches, standings]);
+
+  useEffect(() => {
+    if (leagueChampion && tournament && tournament.status !== 'completed') {
+      supabase.from('tournaments').update({ 
+        status: 'completed', 
+        winner_id: leagueChampion.playerId 
+      }).eq('id', tournamentId).then(() => loadData());
+    }
+  }, [leagueChampion]);
+
   const startTournament = async () => {
     if (!tournament) return;
 
@@ -884,11 +902,11 @@ export function TournamentDetailScreen({ userId, tournamentId, onBack }: Tournam
         )}
 
         {/* Champion UI */}
-        {tournament?.status === 'completed' && tournament.winner_id && (
+        {((tournament?.status === 'completed' && tournament.winner_id) || leagueChampion) && (
           <View style={[styles.infoCard, { marginTop: 0, paddingVertical: 16, alignItems: 'center', borderColor: COLORS.warning, borderWidth: 1 }]}>
             <Text style={{ fontSize: 13, fontWeight: '700', color: COLORS.warning, letterSpacing: 1, marginBottom: 4 }}>🏆 CHAMPION</Text>
             <Text style={{ fontSize: 20, fontWeight: '800', color: COLORS.textPrimary }}>
-              {participants.find(p => p.user_id === tournament.winner_id)?.display_name ?? 'Champion selected'}
+              {leagueChampion ? leagueChampion.name : (participants.find(p => p.user_id === tournament?.winner_id)?.display_name ?? 'Champion selected')}
             </Text>
           </View>
         )}
